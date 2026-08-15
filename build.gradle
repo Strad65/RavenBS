@@ -1,0 +1,116 @@
+buildscript {
+    repositories {
+        mavenCentral()
+        maven { name = 'forge'; url = 'https://maven.minecraftforge.net' }
+        maven { name = 'sponge'; url = 'https://repo.spongepowered.org/repository/maven-public/' }
+        maven { name = 'gradle-plugins'; url = 'https://plugins.gradle.org/m2' }
+    }
+    dependencies {
+        classpath 'net.minecraftforge.gradle:ForgeGradle:2.1-SNAPSHOT'
+    }
+}
+
+apply plugin: 'net.minecraftforge.gradle.forge'
+apply plugin: 'java'
+
+version = 'bS-997'
+group = 'keystrokesmod'
+archivesBaseName = 'raven'
+
+sourceCompatibility = targetCompatibility = '1.8'
+compileJava {
+    sourceCompatibility = targetCompatibility = '1.8'
+    options.encoding = 'UTF-8'
+}
+
+minecraft {
+    version = '1.8.9-11.15.1.2318-1.8.9'
+    runDir = 'run'
+    // The jar's members were SRG-named; sources were remapped to stable_22.
+    mappings = 'stable_22'
+    makeObfSourceJar = false
+}
+
+repositories {
+    mavenCentral()
+    maven { name = 'sponge'; url = 'https://repo.spongepowered.org/repository/maven-public/' }
+}
+
+configurations {
+    // Libraries that must be bundled into the final jar (they are not provided
+    // by Forge at runtime).
+    shade
+    compile.extendsFrom shade
+}
+
+dependencies {
+    // Mixin 0.7.11 matches the version shaded into the original jar.
+    shade('org.spongepowered:mixin:0.7.11-SNAPSHOT') {
+        exclude module: 'commons-io'
+        exclude module: 'gson'
+        exclude module: 'guava'
+        exclude module: 'launchwrapper'
+        exclude module: 'log4j-core'
+    }
+    // Versions chosen to match the class sets bundled in the original jar.
+    // Forge 1.8.9 ships log4j but not slf4j, so slf4j-api must be bundled for
+    // Java-WebSocket to work at runtime.
+    shade 'org.java-websocket:Java-WebSocket:1.5.7'
+    shade 'org.slf4j:slf4j-api:2.0.13'
+    // The mixin jar on the compile classpath doubles as the annotation processor
+    // (declared in its META-INF/services); Gradle 2.7 has no annotationProcessor
+    // configuration, so classpath discovery is how the refmap gets generated.
+}
+
+// Mixin's annotation processor writes the refmap that maps MCP names back to SRG.
+// genSrgs materialises mcp-srg.srg in the ForgeGradle cache, so take the path
+// from the task itself rather than hardcoding a cache location.
+compileJava.dependsOn 'genSrgs'
+afterEvaluate {
+    compileJava {
+        options.compilerArgs += [
+            "-AreobfSrgFile=${tasks.genSrgs.mcpToSrg.canonicalPath}",
+            "-AoutRefMapFile=${project.file('build/mixins.raven.refmap.json')}",
+            // @Shadow/@Overwrite members must be renamed to SRG in the output
+            // jar. The refmap does not cover them, so the AP emits this srg and
+            // reobfJar consumes it as a secondary mapping set.
+            "-AoutSrgFile=${project.file('build/mixins.raven.srg')}",
+        ]
+    }
+    reobfJar.addSecondarySrgFile project.file('build/mixins.raven.srg')
+}
+
+processResources {
+    inputs.property 'version', project.version
+    inputs.property 'mcversion', project.minecraft.version
+
+    from(sourceSets.main.resources.srcDirs) {
+        include 'mcmod.info'
+        expand 'version': project.version, 'mcversion': project.minecraft.version
+    }
+    from(sourceSets.main.resources.srcDirs) {
+        exclude 'mcmod.info'
+    }
+}
+
+jar {
+    // Bundle the shaded libraries so the mod runs standalone, as the original did.
+    from(configurations.shade.collect { it.isDirectory() ? it : zipTree(it) }) {
+        exclude 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA', 'META-INF/maven/**'
+        // ForgeGradle 2.1 reobfuscation uses an ASM too old to parse Java 9+
+        // bytecode, so multi-release entries and module descriptors must go.
+        // The original jar shipped without them too.
+        exclude 'META-INF/versions/**', 'module-info.class', '**/module-info.class'
+    }
+    // The generated refmap lands in build/ rather than resources.
+    from("$buildDir/mixins.raven.refmap.json")
+
+    manifest {
+        attributes(
+            'FMLCorePluginContainsFMLMod': 'true',
+            'ForceLoadAsMod': 'true',
+            'TweakClass': 'org.spongepowered.asm.launch.MixinTweaker',
+            'MixinConfigs': 'mixins.raven.json'
+        )
+    }
+}

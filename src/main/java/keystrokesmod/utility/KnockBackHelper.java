@@ -1,0 +1,67 @@
+package keystrokesmod.utility;
+
+import java.util.ArrayDeque;
+import java.util.Queue;
+import keystrokesmod.event.ReceivePacketEvent;
+import keystrokesmod.event.RunGameLoopEvent;
+import net.minecraft.client.Minecraft;
+import net.minecraft.network.Packet;
+import net.minecraft.network.play.server.S12PacketEntityVelocity;
+import net.minecraft.network.play.server.S27PacketExplosion;
+import net.minecraftforge.event.entity.EntityJoinWorldEvent;
+import net.minecraftforge.fml.common.eventhandler.EventPriority;
+import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
+
+public class KnockBackHelper {
+   private final Minecraft mc = Minecraft.getMinecraft();
+   private final Queue<Packet> packets = new ArrayDeque<>();
+   private boolean cancel = false;
+   private boolean releasePackets = false;
+
+   @SubscribeEvent(priority = EventPriority.LOWEST)
+   public void onReceivePacket(ReceivePacketEvent e) {
+      if (Utils.nullCheck()) {
+         if (e.getPacket() instanceof S12PacketEntityVelocity || e.getPacket() instanceof S27PacketExplosion) {
+            if (e.getPacket() instanceof S12PacketEntityVelocity
+               && ((S12PacketEntityVelocity)e.getPacket()).getEntityID() == this.mc.thePlayer.getEntityId()
+               && this.cancel) {
+               this.packets.add(e.getPacket());
+               e.setCanceled(true);
+            } else if (e.getPacket() instanceof S27PacketExplosion && this.cancel) {
+               this.packets.add(e.getPacket());
+               e.setCanceled(true);
+            }
+         }
+      }
+   }
+
+   @SubscribeEvent
+   public void onGameLoop(RunGameLoopEvent e) {
+      if (Utils.nullCheck() && this.releasePackets) {
+         while (!this.packets.isEmpty()) {
+            Packet p = this.packets.poll();
+            if (p != null) {
+               p.processPacket(this.mc.getNetHandler());
+            }
+         }
+
+         this.releasePackets = false;
+      }
+   }
+
+   @SubscribeEvent
+   public void onWorldJoin(EntityJoinWorldEvent e) {
+      if (e.entity == this.mc.thePlayer) {
+         this.packets.clear();
+      }
+   }
+
+   public void capturePackets() {
+      this.cancel = true;
+   }
+
+   public void releasePackets() {
+      this.cancel = false;
+      this.releasePackets = true;
+   }
+}
