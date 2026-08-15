@@ -116,11 +116,12 @@ public class Nametags extends Module {
                      + 0.294;
                   double heightOffset = playerY + (!en.isSneaking() ? en.height : en.height - 0.3) + 0.294;
                   ((IAccessorEntityRenderer)mc.entityRenderer).callSetupCameraTransform(((IAccessorMinecraft)mc).getTimer().renderPartialTicks, 0);
-                  // Read projection matrix to get actual FOV for zoom compensation.
-                  // projBuf[5] = 1/tan(verticalFov/2); smaller FOV (zoom) → larger value.
+                  // Read projection matrix: projBuf[5] = 1/tan(verticalFov/2)
+                  // Baseline is user's normal FOV=100°, baseProjY = 1/tan(50°)
+                  // zoom→smaller FOV→larger projY→fovScale>1→nametag scales up
                   FloatBuffer projBuf = BufferUtils.createFloatBuffer(16);
                   GL11.glGetFloat(GL11.GL_PROJECTION_MATRIX, projBuf);
-                  float baseProjY = (float)(1.0 / Math.tan(Math.toRadians(35.0))); // baseline: 70° FOV
+                  float baseProjY = (float)(1.0 / Math.tan(Math.toRadians(50.0))); // baseline: 100° FOV
                   float fovScale = projBuf.get(5) / baseProjY; // >1 when zoomed in
                   Vec3 screenCords = RenderUtils.convertTo2D(
                      scaledResolution.getScaleFactor(),
