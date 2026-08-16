@@ -362,7 +362,7 @@ public class FakeLag extends Module {
         GlStateManager.tryBlendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, 1, 0);
         GlStateManager.color(color.getRed() / 255.0F, color.getGreen() / 255.0F, color.getBlue() / 255.0F, color.getAlpha() / 255.0F);
 
-        GL11.glLineWidth(2.0F);
+        GL11.glLineWidth(5.0F);
         GL11.glBegin(GL11.GL_LINES);
         GL11.glVertex3d(renderX1, renderY1, renderZ1);
         GL11.glVertex3d(renderX2, renderY2, renderZ2);

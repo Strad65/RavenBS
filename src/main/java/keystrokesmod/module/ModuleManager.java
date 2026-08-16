@@ -10,6 +10,7 @@ import keystrokesmod.module.impl.client.Gui;
 import keystrokesmod.module.impl.client.Settings;
 import keystrokesmod.module.impl.combat.AimAssist;
 import keystrokesmod.module.impl.combat.AutoClicker;
+import keystrokesmod.module.impl.combat.Backtrack;
 import keystrokesmod.module.impl.combat.ClickAssist;
 import keystrokesmod.module.impl.combat.HitBox;
 import keystrokesmod.module.impl.combat.KillAura;
@@ -167,6 +168,7 @@ public class ModuleManager {
       this.addModule(autoClicker = new AutoClicker());
       this.addModule(LongJump = new LongJump());
       this.addModule(new AimAssist());
+      this.addModule(new Backtrack());
       this.addModule(weather = new Weather());
       this.addModule(chatCommands = new ChatCommands());
       this.addModule(new ClickAssist());
