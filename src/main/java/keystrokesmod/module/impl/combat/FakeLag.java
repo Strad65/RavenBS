@@ -1,13 +1,15 @@
-package keystrokesmod.module.impl.player;
+package keystrokesmod.module.impl.combat;
 
 import keystrokesmod.event.SendPacketEvent;
 import keystrokesmod.module.Module;
 import keystrokesmod.module.ModuleManager;
+import keystrokesmod.module.impl.render.HUD;
 import keystrokesmod.module.impl.world.AntiBot;
 import keystrokesmod.module.setting.impl.ButtonSetting;
 import keystrokesmod.module.setting.impl.SliderSetting;
 import keystrokesmod.utility.PacketUtils;
 import keystrokesmod.utility.RenderUtils;
+import keystrokesmod.utility.Theme;
 import keystrokesmod.utility.Utils;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.entity.player.EntityPlayer;
@@ -58,7 +60,7 @@ public class FakeLag extends Module {
     public SliderSetting jitterAmount;
 
     // Visualization
-    private String[] showPositionModes = {"Off", "Box", "Box + Line"};
+    private String[] showPositionModes = {"Off", "On"};
     public SliderSetting showPosition;
 
     // State tracking
@@ -71,7 +73,7 @@ public class FakeLag extends Module {
     private long lagStartTime = 0L;
 
     public FakeLag() {
-        super("Fake Lag", Module.category.player, 0);
+        super("FakeLag", Module.category.combat, 0);
 
         this.registerSetting(startRange = new SliderSetting("Start range", 4.0, 3.0, 6.0, 0.1));
         this.registerSetting(stopRange = new SliderSetting("Stop range", 3.0, 2.5, 5.0, 0.1));
@@ -306,7 +308,7 @@ public class FakeLag extends Module {
     @SubscribeEvent
     public void onRenderWorld(RenderWorldLastEvent event) {
         if (!Utils.nullCheck()) return;
-        if (showPosition.getInput() == 0) return;
+        if (showPosition.getInputAsInt() == 0) return;
         if (!isLagging || laggedPosition == null) return;
         if (mc.gameSettings.thirdPersonView == 0) return;
 
@@ -318,59 +320,36 @@ public class FakeLag extends Module {
         double renderY = laggedPosition.yCoord - mc.getRenderManager().viewerPosY;
         double renderZ = laggedPosition.zCoord - mc.getRenderManager().viewerPosZ;
 
-        // Get color (red with transparency)
-        Color color = new Color(255, 85, 85, 100);
+        // Use HUD theme color like LagRange
+        int color = Theme.getGradient((int)HUD.theme.getInput(), 0.0);
+        float a = (color >> 24 & 0xFF) / 255.0F;
+        float r = (color >> 16 & 0xFF) / 255.0F;
+        float g = (color >> 8 & 0xFF) / 255.0F;
+        float b = (color & 0xFF) / 255.0F;
 
-        // Render box using RenderUtils.renderBox with Color overload
-        RenderUtils.renderBox(
-                renderX - mc.thePlayer.width / 2.0,
-                renderY,
-                renderZ - mc.thePlayer.width / 2.0,
-                mc.thePlayer.width,
-                mc.thePlayer.height,
-                mc.thePlayer.width,
-                color,  // Direct Color object
-                true,   // outline
-                true    // shade
+        AxisAlignedBB bbox = mc.thePlayer.getEntityBoundingBox().expand(0.1, 0.1, 0.1);
+        AxisAlignedBB axis = new AxisAlignedBB(
+            bbox.minX - mc.thePlayer.posX + renderX,
+            bbox.minY - mc.thePlayer.posY + renderY,
+            bbox.minZ - mc.thePlayer.posZ + renderZ,
+            bbox.maxX - mc.thePlayer.posX + renderX,
+            bbox.maxY - mc.thePlayer.posY + renderY,
+            bbox.maxZ - mc.thePlayer.posZ + renderZ
         );
 
-        // Draw line if enabled
-        if (showPosition.getInputAsInt() == 2) {
-            renderConnectionLine(partialTicks);
-        }
-    }
-
-    private void renderConnectionLine(float partialTicks) {
-        double currentX = mc.thePlayer.lastTickPosX + (mc.thePlayer.posX - mc.thePlayer.lastTickPosX) * partialTicks;
-        double currentY = mc.thePlayer.lastTickPosY + (mc.thePlayer.posY - mc.thePlayer.lastTickPosY) * partialTicks;
-        double currentZ = mc.thePlayer.lastTickPosZ + (mc.thePlayer.posZ - mc.thePlayer.lastTickPosZ) * partialTicks;
-
-        double renderX1 = currentX - mc.getRenderManager().viewerPosX;
-        double renderY1 = currentY + mc.thePlayer.height / 2.0 - mc.getRenderManager().viewerPosY;
-        double renderZ1 = currentZ - mc.getRenderManager().viewerPosZ;
-
-        double renderX2 = laggedPosition.xCoord - mc.getRenderManager().viewerPosX;
-        double renderY2 = laggedPosition.yCoord + mc.thePlayer.height / 2.0 - mc.getRenderManager().viewerPosY;
-        double renderZ2 = laggedPosition.zCoord - mc.getRenderManager().viewerPosZ;
-
-        Color color = new Color(255, 85, 85, 200);
-
         GlStateManager.pushMatrix();
-        GlStateManager.disableTexture2D();
-        GlStateManager.enableBlend();
-        GlStateManager.disableDepth();
-        GlStateManager.tryBlendFuncSeparate(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA, 1, 0);
-        GlStateManager.color(color.getRed() / 255.0F, color.getGreen() / 255.0F, color.getBlue() / 255.0F, color.getAlpha() / 255.0F);
-
-        GL11.glLineWidth(5.0F);
-        GL11.glBegin(GL11.GL_LINES);
-        GL11.glVertex3d(renderX1, renderY1, renderZ1);
-        GL11.glVertex3d(renderX2, renderY2, renderZ2);
-        GL11.glEnd();
-
-        GlStateManager.enableDepth();
-        GlStateManager.disableBlend();
-        GlStateManager.enableTexture2D();
+        GL11.glBlendFunc(770, 771);
+        GL11.glEnable(3042);
+        GL11.glDisable(3553);
+        GL11.glDisable(2929);
+        GL11.glDepthMask(false);
+        GL11.glLineWidth(2.0F);
+        GL11.glColor4f(r, g, b, a);
+        RenderUtils.drawBoundingBox(axis, r, g, b);
+        GL11.glEnable(3553);
+        GL11.glEnable(2929);
+        GL11.glDepthMask(true);
+        GL11.glDisable(3042);
         GlStateManager.popMatrix();
     }
 }

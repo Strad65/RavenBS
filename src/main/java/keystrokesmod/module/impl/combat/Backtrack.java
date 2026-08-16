@@ -3,25 +3,29 @@ package keystrokesmod.module.impl.combat;
 import keystrokesmod.event.ReceivePacketEvent;
 import keystrokesmod.event.SendPacketEvent;
 import keystrokesmod.module.Module;
+import keystrokesmod.module.impl.render.HUD;
 import keystrokesmod.module.impl.world.AntiBot;
 import keystrokesmod.module.setting.impl.ButtonSetting;
 import keystrokesmod.module.setting.impl.SliderSetting;
 import keystrokesmod.utility.PacketUtils;
 import keystrokesmod.utility.RenderUtils;
+import keystrokesmod.utility.Theme;
 import keystrokesmod.utility.Utils;
+import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.network.Packet;
 import net.minecraft.network.play.server.S13PacketDestroyEntities;
 import net.minecraft.network.play.server.S14PacketEntity;
 import net.minecraft.network.play.server.S18PacketEntityTeleport;
 import net.minecraft.network.play.server.S19PacketEntityStatus;
+import net.minecraft.util.AxisAlignedBB;
 import net.minecraft.util.Vec3;
 import net.minecraftforge.client.event.RenderWorldLastEvent;
 import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent.ClientTickEvent;
+import org.lwjgl.opengl.GL11;
 
-import java.awt.*;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -42,7 +46,7 @@ public class Backtrack extends Module {
     public ButtonSetting invisibles;
 
     // Visualization
-    private String[] showPositionModes = {"Off", "Box", "Box + Outline"};
+    private String[] showPositionModes = {"Off", "On"};
     public SliderSetting showPosition;
 
     // State tracking
@@ -353,24 +357,37 @@ public class Backtrack extends Module {
         double renderY = trackedPosition.yCoord - mc.getRenderManager().viewerPosY;
         double renderZ = trackedPosition.zCoord - mc.getRenderManager().viewerPosZ;
 
-        // White box with higher opacity
-        Color boxColor = new Color(255, 255, 255, 150);
-        Color outlineColor = new Color(255, 255, 255, 255);
+        // Use HUD theme color like LagRange
+        int color = Theme.getGradient((int)HUD.theme.getInput(), 0.0);
+        float a = (color >> 24 & 0xFF) / 255.0F;
+        float r = (color >> 16 & 0xFF) / 255.0F;
+        float g = (color >> 8 & 0xFF) / 255.0F;
+        float b = (color & 0xFF) / 255.0F;
 
-        boolean renderOutline = showPosition.getInputAsInt() == 2;
-
-        // Render box
-        RenderUtils.renderBox(
-            renderX - target.width / 2.0,
-            renderY,
-            renderZ - target.width / 2.0,
-            target.width,
-            target.height,
-            target.width,
-            boxColor,
-            renderOutline,
-            true
+        AxisAlignedBB bbox = target.getEntityBoundingBox().expand(0.1, 0.1, 0.1);
+        AxisAlignedBB axis = new AxisAlignedBB(
+            bbox.minX - target.posX + renderX,
+            bbox.minY - target.posY + renderY,
+            bbox.minZ - target.posZ + renderZ,
+            bbox.maxX - target.posX + renderX,
+            bbox.maxY - target.posY + renderY,
+            bbox.maxZ - target.posZ + renderZ
         );
+
+        GlStateManager.pushMatrix();
+        GL11.glBlendFunc(770, 771);
+        GL11.glEnable(3042);
+        GL11.glDisable(3553);
+        GL11.glDisable(2929);
+        GL11.glDepthMask(false);
+        GL11.glLineWidth(2.0F);
+        GL11.glColor4f(r, g, b, a);
+        RenderUtils.drawBoundingBox(axis, r, g, b);
+        GL11.glEnable(3553);
+        GL11.glEnable(2929);
+        GL11.glDepthMask(true);
+        GL11.glDisable(3042);
+        GlStateManager.popMatrix();
     }
 
     // Helper class to store packets with timestamp
