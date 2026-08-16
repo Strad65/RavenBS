@@ -162,11 +162,13 @@ public class Backtrack extends Module {
             } else if (target == closestTarget) {
                 // Same target - check if conditions met to start/continue tracking
                 boolean isRetreating = currentDistance > lastDistance;
-                boolean wasInAttackRange = lastDistance > 0 && lastDistance <= ATTACK_RANGE;
-                boolean isLeavingRange = wasInAttackRange && isRetreating;
+                boolean isBeyondAttackRange = currentDistance > ATTACK_RANGE;
 
-                // Only start tracking when enemy is leaving attack range while retreating
-                if (!isTracking && isLeavingRange && currentDistance < maxRange.getInput()) {
+                // Only start tracking when:
+                // (1) Enemy is beyond 3 blocks
+                // (2) Enemy is retreating (distance increasing)
+                // (3) Still within max tracking range
+                if (!isTracking && isBeyondAttackRange && isRetreating && currentDistance < maxRange.getInput()) {
                     startTracking(closestTarget);
                 }
 
