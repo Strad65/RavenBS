@@ -31,6 +31,9 @@ import java.util.Iterator;
 import java.util.List;
 
 public class Backtrack extends Module {
+    // Range constants
+    private static final double ATTACK_RANGE = 3.0; // Distance threshold to consider "in attack range"
+
     // Core parameters
     public SliderSetting delay;
     public SliderSetting maxRange;
@@ -54,6 +57,9 @@ public class Backtrack extends Module {
     private Vec3 trackedPosition = null;
     private List<TimedPacket> packetQueue = new ArrayList<>();
     private boolean isTracking = false;
+
+    // Distance tracking for retreat detection
+    private double lastDistance = 0.0;
 
     public Backtrack() {
         super("Backtrack", Module.category.combat, 0);
@@ -82,12 +88,14 @@ public class Backtrack extends Module {
     @Override
     public void onEnable() {
         clearTracking();
+        lastDistance = 0.0;
     }
 
     @Override
     public void onDisable() {
         releaseAllPackets();
         clearTracking();
+        lastDistance = 0.0;
     }
 
     @SubscribeEvent
@@ -134,16 +142,44 @@ public class Backtrack extends Module {
         EntityPlayer closestTarget = findTarget();
 
         if (closestTarget != null) {
-            if (target != closestTarget) {
-                // Target changed
+            double currentDistance = mc.thePlayer.getDistanceToEntity(closestTarget);
+
+            // Check if this is a new target or if we're updating an existing one
+            boolean isNewTarget = (target != closestTarget);
+
+            if (isNewTarget) {
+                // New target detected - reset tracking
                 stopTracking();
-                startTracking(closestTarget);
+                lastDistance = currentDistance;
+
+                // Check defensive conditions before starting tracking:
+                // (1) Distance is increasing (enemy retreating)
+                // (2) Enemy is leaving attack range
+
+                // For a new target, we cannot determine retreat immediately
+                // So we initialize distance tracking but don't start delay yet
+                target = closestTarget;
+            } else if (target == closestTarget) {
+                // Same target - check if conditions met to start/continue tracking
+                boolean isRetreating = currentDistance > lastDistance;
+                boolean wasInAttackRange = lastDistance > 0 && lastDistance <= ATTACK_RANGE;
+                boolean isLeavingRange = wasInAttackRange && isRetreating;
+
+                // Only start tracking when enemy is leaving attack range while retreating
+                if (!isTracking && isLeavingRange && currentDistance < maxRange.getInput()) {
+                    startTracking(closestTarget);
+                }
+
+                // Update last distance for next tick
+                lastDistance = currentDistance;
             }
         } else {
             // No valid target
             if (isTracking) {
                 stopTracking();
             }
+            target = null;
+            lastDistance = 0.0;
         }
     }
 
@@ -225,6 +261,7 @@ public class Backtrack extends Module {
     private void stopTracking() {
         releaseAllPackets();
         clearTracking();
+        lastDistance = 0.0;
     }
 
     private void clearTracking() {
