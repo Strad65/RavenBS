@@ -29,6 +29,14 @@ import java.util.Random;
 public class FakeLag extends Module {
     private static final Random random = new Random();
 
+    // Movement speed thresholds
+    private static final double MIN_TARGET_SPEED = 0.1;  // Minimum target movement speed (blocks/tick)
+    private static final double MIN_PLAYER_SPEED = 0.05; // Minimum player movement speed (blocks/tick)
+    private static final double RETREATING_TARGET_SPEED = 0.1; // Target speed for retreating mode
+
+    // Range constants
+    private static final double EXTRA_RANGE_BUFFER = 2.0; // Additional range before stopping lag
+
     // Core parameters
     public SliderSetting startRange;
     public SliderSetting stopRange;
@@ -69,7 +77,7 @@ public class FakeLag extends Module {
         this.registerSetting(stopRange = new SliderSetting("Stop range", 3.0, 2.5, 5.0, 0.1));
         this.registerSetting(minDelay = new SliderSetting("Min delay", 80.0, 30.0, 300.0, 10.0));
         this.registerSetting(maxDelay = new SliderSetting("Max delay", 180.0, 50.0, 500.0, 10.0));
-        this.registerSetting(cooldown = new SliderSetting("Cooldown", 3000.0, 1000.0, 5000.0, 100.0));
+        this.registerSetting(cooldown = new SliderSetting("Cooldown", 3000.0, 300.0, 5000.0, 100.0));
 
         this.registerSetting(triggerMode = new SliderSetting("Trigger mode", 0, triggerModes));
 
@@ -89,7 +97,7 @@ public class FakeLag extends Module {
             long remaining = (lagStartTime + currentDelay - System.currentTimeMillis());
             return remaining + "ms";
         }
-        return (int)minDelay.getInput() + "-" + (int)maxDelay.getInput() + "ms";
+        return minDelay.getInputAsInt() + "-" + maxDelay.getInputAsInt() + "ms";
     }
 
     @Override
@@ -172,7 +180,7 @@ public class FakeLag extends Module {
             }
         } else {
             // Check if should stop (too close or too far)
-            if (distance < stopRange.getInput() || distance > startRange.getInput() + 2.0) {
+            if (distance < stopRange.getInput() || distance > startRange.getInput() + EXTRA_RANGE_BUFFER) {
                 stopLag();
             }
         }
@@ -201,7 +209,7 @@ public class FakeLag extends Module {
             if (!isValidTarget(player)) continue;
 
             double dist = mc.thePlayer.getDistanceToEntity(player);
-            if (dist < startRange.getInput() + 2.0 && dist < closestDist) {
+            if (dist < startRange.getInput() + EXTRA_RANGE_BUFFER && dist < closestDist) {
                 closest = player;
                 closestDist = dist;
             }
@@ -211,13 +219,7 @@ public class FakeLag extends Module {
     }
 
     private boolean isValidTarget(EntityPlayer player) {
-        if (player == mc.thePlayer || player == mc.thePlayer.ridingEntity) return false;
-        if (player.deathTime > 0) return false;
-        if (Utils.isFriended(player)) return false;
-        if (teams.isToggled() && Utils.isTeammate(player)) return false;
-        if (botCheck.isToggled() && AntiBot.isBot(player)) return false;
-
-        return true;
+        return Utils.isValidCombatTarget(player, teams.isToggled(), botCheck.isToggled());
     }
 
     private boolean shouldTriggerForTarget(EntityPlayer target, double distance) {
@@ -234,17 +236,17 @@ public class FakeLag extends Module {
         double lastDistance = playerLastPos.distanceTo(targetLastPos);
         boolean approaching = distance < lastDistance;
 
-        int mode = (int)triggerMode.getInput();
+        int mode = triggerMode.getInputAsInt();
 
         if (mode == 0) {
             // Approaching - target moving towards you
-            return approaching && targetSpeed > 0.1;
+            return approaching && targetSpeed > MIN_TARGET_SPEED;
         } else if (mode == 1) {
             // Both Moving - both players moving
-            return playerSpeed > 0.05 && targetSpeed > 0.05;
+            return playerSpeed > MIN_PLAYER_SPEED && targetSpeed > MIN_PLAYER_SPEED;
         } else if (mode == 2) {
             // Retreating - you backing away while target chases
-            return !approaching && playerSpeed > 0.05 && targetSpeed > 0.1;
+            return !approaching && playerSpeed > MIN_PLAYER_SPEED && targetSpeed > RETREATING_TARGET_SPEED;
         }
 
         return approaching;
@@ -257,8 +259,8 @@ public class FakeLag extends Module {
         lastTriggerTime = lagStartTime;
 
         // Calculate delay
-        int min = (int)minDelay.getInput();
-        int max = (int)maxDelay.getInput();
+        int min = minDelay.getInputAsInt();
+        int max = maxDelay.getInputAsInt();
         currentDelay = min + random.nextInt(Math.max(1, max - min + 1));
 
         // Store lagged position
@@ -319,7 +321,7 @@ public class FakeLag extends Module {
         // Get color (red with transparency)
         Color color = new Color(255, 85, 85, 100);
 
-        // Render box using RenderUtils.renderBox
+        // Render box using RenderUtils.renderBox with Color overload
         RenderUtils.renderBox(
                 renderX - mc.thePlayer.width / 2.0,
                 renderY,
@@ -327,13 +329,13 @@ public class FakeLag extends Module {
                 mc.thePlayer.width,
                 mc.thePlayer.height,
                 mc.thePlayer.width,
-                color.getRGB(),
-                true,  // outline
-                true   // shade
+                color,  // Direct Color object
+                true,   // outline
+                true    // shade
         );
 
         // Draw line if enabled
-        if ((int)showPosition.getInput() == 2) {
+        if (showPosition.getInputAsInt() == 2) {
             renderConnectionLine(partialTicks);
         }
     }

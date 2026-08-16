@@ -103,6 +103,29 @@ public class SliderSetting extends Setting {
       return roundToInterval(this.defaultValue, 4);
    }
 
+   /**
+    * Type-safe helper: get slider value as int (useful for mode sliders and discrete values)
+    * @return The current value cast to int
+    */
+   public int getInputAsInt() {
+      return (int) getInput();
+   }
+
+   /**
+    * Type-safe helper: get the selected mode string from options array
+    * @return The currently selected mode string, or empty string if not a mode slider
+    */
+   public String getInputAsMode() {
+      if (options == null || options.length == 0) {
+         return "";
+      }
+      int index = getInputAsInt();
+      if (index >= 0 && index < options.length) {
+         return options[index];
+      }
+      return "";
+   }
+
    public double getMin() {
       return this.min;
    }

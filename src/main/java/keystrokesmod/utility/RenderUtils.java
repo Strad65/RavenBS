@@ -191,6 +191,13 @@ public class RenderUtils {
       GL11.glPopMatrix();
    }
 
+   /**
+    * Overload: accept Color object for clearer API
+    */
+   public static void renderBox(double x, double y, double z, double x2, double y2, double z2, java.awt.Color color, boolean outline, boolean shade) {
+      renderBox(x, y, z, x2, y2, z2, color.getRGB(), outline, shade);
+   }
+
    public static void renderBPS(boolean b, boolean b2) {
       ScaledResolution scaledResolution = new ScaledResolution(mc);
       String s = "";

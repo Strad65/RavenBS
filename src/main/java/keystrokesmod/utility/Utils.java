@@ -961,6 +961,23 @@ public class Utils {
       return false;
    }
 
+   /**
+    * Unified combat target validation for modules like KillAura, AimAssist, FakeLag, etc.
+    *
+    * @param player The player to check
+    * @param checkTeams Whether to filter out teammates
+    * @param checkBots Whether to filter out bots (requires AntiBot module)
+    * @return true if the player is a valid combat target
+    */
+   public static boolean isValidCombatTarget(EntityPlayer player, boolean checkTeams, boolean checkBots) {
+      if (player == mc.thePlayer || player == mc.thePlayer.ridingEntity) return false;
+      if (player.deathTime > 0) return false;
+      if (isFriended(player)) return false;
+      if (checkTeams && isTeammate(player)) return false;
+      if (checkBots && AntiBot.isBot(player)) return false;
+      return true;
+   }
+
    public static String getNetworkDisplayName() {
       try {
          NetworkPlayerInfo playerInfo = mc.getNetHandler().getPlayerInfo(mc.thePlayer.getUniqueID());
