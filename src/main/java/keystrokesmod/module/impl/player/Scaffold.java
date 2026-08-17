@@ -64,7 +64,7 @@ public class Scaffold extends Module {
    public ButtonSetting showBlockCount;
    private ButtonSetting silentSwing;
    private ButtonSetting prioritizeSprintWithSpeed;
-   private String[] rotationModes = new String[]{"§cDisabled", "Simple", "Offset", "Precise"};
+   private String[] rotationModes = new String[]{"§cDisabled", "Simple", "Offset", "Precise", "Center"};
    private String[] fakeRotationModes = new String[]{"§cDisabled", "None", "Strict", "Smooth", "Spin", "Precise"};
    private String[] sprintModes = new String[]{"§cDisabled", "Vanilla", "Float"};
    private String[] fastScaffoldModes = new String[]{"§cDisabled", "Jump A", "Jump B", "Jump B Low", "Jump E", "Keep-Y", "Keep-Y Low"};
@@ -200,6 +200,11 @@ public class Scaffold extends Module {
    double[] speedLevels = new double[]{0.48, 0.5, 0.52, 0.58, 0.68};
    double[] floatSpeedLevels = new double[]{0.2, 0.22, 0.27, 0.29, 0.3};
    private float finalhYaw;
+
+   // Center mode (Telly) state
+   private boolean tellyWasAirborne = false;
+   private int tellyJumpTimer = 0;
+   private static final int TELLY_JUMP_DELAY = 2;
 
    public Scaffold() {
       super("Scaffold", Module.category.player);
@@ -530,6 +535,10 @@ public class Scaffold extends Module {
                   break;
                case 3:
                   this.preciseRots(e);
+                  break;
+               case 4:
+                  this.centerRots(e);
+                  break;
             }
 
             if (this.edge != 1.0F) {
@@ -994,6 +1003,61 @@ public class Scaffold extends Module {
       this.theYaw = this.yaw;
    }
 
+   private void centerRots(ClientRotationEvent e) {
+      // If Fast on RMB is enabled and RMB not held -> behave like Simple
+      if (this.fastOnRMB.isToggled() && !this.fastOnRMB()) {
+         this.simpleRots(e);
+         return;
+      }
+
+      // Backwards rotation: face direction opposite to movement
+      float backwardsYaw = mc.thePlayer.rotationYaw - this.hardcodedYaw();
+      this.yaw = backwardsYaw;
+      this.pitch = this.blockRotations != null ? this.blockRotations[1] : 85.0F;
+
+      e.setRotations(this.yaw, this.pitch);
+      this.theYaw = this.yaw;
+
+      // Always apply silent move fix
+      this.applyCenterMoveFix(this.yaw);
+
+      // Telly jump logic: trigger jump on ground when moving
+      if (mc.thePlayer.onGround && Utils.isMoving() && !ModuleManager.tower.canTower()) {
+         if (this.tellyJumpTimer <= 0) {
+            this.jump = true;
+            jumpDelayVal = 4;
+            airTickVal = 5;
+            this.canSprint = true;
+         } else {
+            this.tellyJumpTimer--;
+         }
+      }
+
+      // Track airborne state for jump timing
+      if (!mc.thePlayer.onGround) {
+         this.tellyWasAirborne = true;
+      } else if (this.tellyWasAirborne) {
+         this.tellyJumpTimer = TELLY_JUMP_DELAY;
+         this.tellyWasAirborne = false;
+      }
+   }
+
+   private void applyCenterMoveFix(float serverYaw) {
+      float yawDiff = MathHelper.wrapAngleTo180_float(serverYaw - mc.thePlayer.rotationYaw);
+      float rad = (float) Math.toRadians(yawDiff);
+      float cos = (float) Math.cos(rad);
+      float sin = (float) Math.sin(rad);
+
+      float origForward = mc.thePlayer.movementInput.moveForward;
+      float origStrafe = mc.thePlayer.movementInput.moveStrafe;
+
+      mc.thePlayer.movementInput.moveForward = origForward * cos - origStrafe * sin;
+      mc.thePlayer.movementInput.moveStrafe = origStrafe * cos + origForward * sin;
+
+      Settings.fixedForward = mc.thePlayer.movementInput.moveForward;
+      Settings.fixedStrafe = mc.thePlayer.movementInput.moveStrafe;
+   }
+
    private boolean canJump() {
       return !ModuleManager.tower.canTower() && !ModuleManager.tower.delay && Utils.jumpDown()
          || ModuleManager.tower.towerMove.getInput() > 0.0 && ModuleManager.tower.canTower() && Utils.isMoving() && ModuleManager.tower.disableDiag();
@@ -1153,8 +1217,8 @@ public class Scaffold extends Module {
             this.targetBlock = null;
             this.blockInfo = null;
             this.blockRotations = null;
-            this.fastScaffoldKeepY = this.firstKeepYPlace = this.rotateForward = this.rotatingForward = this.floatStarted = this.floatJumped = this.floatWasEnabled = this.towerEdge = this.was451 = this.was452 = this.enabledOffGround = this.finishProcedure = this.jump = this.blink = this.canSprint = this.canSprint2 = this.idle = this.didJump = this.firstRotate = this.bvs = this.began = this.cantRotate = this.startRotation = this.lockRotation = false;
-            this.rotationDelay = this.keepYTicks = this.scaffoldTicks = this.floatTicks = this.rt = this.idleTicks = this.frd = this.back = this.b1t = this.canSnap = this.btm = this.snapDelay = this.srt = this.placeIdle = 0;
+            this.fastScaffoldKeepY = this.firstKeepYPlace = this.rotateForward = this.rotatingForward = this.floatStarted = this.floatJumped = this.floatWasEnabled = this.towerEdge = this.was451 = this.was452 = this.enabledOffGround = this.finishProcedure = this.jump = this.blink = this.canSprint = this.canSprint2 = this.idle = this.didJump = this.firstRotate = this.bvs = this.began = this.cantRotate = this.startRotation = this.lockRotation = this.tellyWasAirborne = false;
+            this.rotationDelay = this.keepYTicks = this.scaffoldTicks = this.floatTicks = this.rt = this.idleTicks = this.frd = this.back = this.b1t = this.canSnap = this.btm = this.snapDelay = this.srt = this.placeIdle = this.tellyJumpTimer = 0;
             this.forwardTicks = 0;
             this.wasForward = false;
             this.jumpDelay = 0;
