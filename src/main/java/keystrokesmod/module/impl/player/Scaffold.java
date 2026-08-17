@@ -40,6 +40,7 @@ import net.minecraft.potion.PotionEffect;
 import net.minecraft.util.BlockPos;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.MathHelper;
+import net.minecraft.util.MovingObjectPosition;
 import net.minecraft.util.Vec3;
 import net.minecraftforge.client.event.MouseEvent;
 import net.minecraftforge.fml.common.FMLCommonHandler;
@@ -281,12 +282,17 @@ public class Scaffold extends Module {
          if (this.dt <= 0) {
             this.dynamic = 0;
             if (this.targetBlock != null) {
-               Vec3 lookAt = new Vec3(
-                  this.targetBlock.xCoord - this.lookVec.xCoord,
-                  this.targetBlock.yCoord - this.lookVec.yCoord,
-                  this.targetBlock.zCoord - this.lookVec.zCoord
-               );
-               this.blockRotations = RotationUtils.getRotations(lookAt);
+               // Use optimized multi-sample aiming for Center mode
+               if (this.rotation.getInput() == 4.0 && this.blockInfo != null) {
+                  this.blockRotations = this.calculateCenterModeRotations();
+               } else {
+                  Vec3 lookAt = new Vec3(
+                     this.targetBlock.xCoord - this.lookVec.xCoord,
+                     this.targetBlock.yCoord - this.lookVec.yCoord,
+                     this.targetBlock.zCoord - this.lookVec.zCoord
+                  );
+                  this.blockRotations = RotationUtils.getRotations(lookAt);
+               }
                this.targetBlock = null;
                this.fakeYaw1 = mc.thePlayer.rotationYaw - this.hardcodedYaw();
                if (this.yawEdge == 0L) {
@@ -1056,6 +1062,92 @@ public class Scaffold extends Module {
 
       Settings.fixedForward = mc.thePlayer.movementInput.moveForward;
       Settings.fixedStrafe = mc.thePlayer.movementInput.moveStrafe;
+   }
+
+   private float[] calculateCenterModeRotations() {
+      if (this.blockInfo == null) {
+         return null;
+      }
+
+      BlockPos blockPos = this.blockInfo.blockPos;
+      EnumFacing facing = this.blockInfo.enumFacing;
+
+      // Multi-sample offsets (5 points per axis)
+      double[] offsets = {0.15, 0.35, 0.5, 0.65, 0.85};
+      double[] xOff = offsets, yOff = offsets, zOff = offsets;
+
+      // Constrain to edge based on facing direction
+      switch (facing) {
+         case NORTH:
+            zOff = new double[]{0.02};
+            break;
+         case EAST:
+            xOff = new double[]{0.98};
+            break;
+         case SOUTH:
+            zOff = new double[]{0.98};
+            break;
+         case WEST:
+            xOff = new double[]{0.02};
+            break;
+         case DOWN:
+            yOff = new double[]{0.02};
+            break;
+         case UP:
+            yOff = new double[]{0.98};
+            break;
+      }
+
+      float bestYaw = this.yaw;
+      float bestPitch = this.pitch;
+      double bestDist = Double.MAX_VALUE;
+
+      // Sample all combinations and find the one closest to current rotation
+      for (double dx : xOff) {
+         for (double dy : yOff) {
+            for (double dz : zOff) {
+               Vec3 targetVec = new Vec3(
+                  blockPos.getX() + dx,
+                  blockPos.getY() + dy,
+                  blockPos.getZ() + dz
+               );
+               float[] rot = RotationUtils.getRotations(targetVec);
+
+               // Verify this rotation actually hits the target block and face via rayTrace
+               MovingObjectPosition mop = RotationUtils.rayTraceCustom(
+                  mc.playerController.getBlockReachDistance(), rot[0], rot[1]
+               );
+
+               if (mop != null
+                   && mop.typeOfHit == MovingObjectPosition.MovingObjectType.BLOCK
+                   && mop.getBlockPos().equals(blockPos)
+                   && mop.sideHit == facing) {
+
+                  // Calculate angular distance from current rotation
+                  double dist = Math.abs(MathHelper.wrapAngleTo180_float(rot[0] - this.yaw))
+                              + Math.abs(rot[1] - this.pitch);
+
+                  if (dist < bestDist) {
+                     bestDist = dist;
+                     bestYaw = rot[0];
+                     bestPitch = rot[1];
+                  }
+               }
+            }
+         }
+      }
+
+      // Return best rotation if found, otherwise fallback to default calculation
+      if (bestDist < Double.MAX_VALUE) {
+         return new float[]{bestYaw, bestPitch};
+      } else {
+         Vec3 lookAt = new Vec3(
+            this.targetBlock.xCoord - this.lookVec.xCoord,
+            this.targetBlock.yCoord - this.lookVec.yCoord,
+            this.targetBlock.zCoord - this.lookVec.zCoord
+         );
+         return RotationUtils.getRotations(lookAt);
+      }
    }
 
    private boolean canJump() {
