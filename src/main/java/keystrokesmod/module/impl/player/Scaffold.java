@@ -65,7 +65,7 @@ public class Scaffold extends Module {
    public ButtonSetting showBlockCount;
    private ButtonSetting silentSwing;
    private ButtonSetting prioritizeSprintWithSpeed;
-   private String[] rotationModes = new String[]{"§cDisabled", "Simple", "Offset", "Precise", "Center"};
+   private String[] rotationModes = new String[]{"§cDisabled", "Simple", "Offset", "Precise", "Center", "Center2"};
    private String[] fakeRotationModes = new String[]{"§cDisabled", "None", "Strict", "Smooth", "Spin", "Precise"};
    private String[] sprintModes = new String[]{"§cDisabled", "Vanilla", "Float"};
    private String[] fastScaffoldModes = new String[]{"§cDisabled", "Jump A", "Jump B", "Jump B Low", "Jump E", "Keep-Y", "Keep-Y Low"};
@@ -285,6 +285,8 @@ public class Scaffold extends Module {
                // Use optimized multi-sample aiming for Center mode
                if (this.rotation.getInput() == 4.0 && this.blockInfo != null) {
                   this.blockRotations = this.calculateCenterModeRotations();
+               } else if (this.rotation.getInput() == 5.0 && this.blockInfo != null) {
+                  this.blockRotations = this.calculateCenter2ModeRotations();
                } else {
                   Vec3 lookAt = new Vec3(
                      this.targetBlock.xCoord - this.lookVec.xCoord,
@@ -543,6 +545,9 @@ public class Scaffold extends Module {
                   this.preciseRots(e);
                   break;
                case 4:
+                  this.centerRots(e);
+                  break;
+               case 5:
                   this.centerRots(e);
                   break;
             }
@@ -1062,6 +1067,44 @@ public class Scaffold extends Module {
 
       Settings.fixedForward = mc.thePlayer.movementInput.moveForward;
       Settings.fixedStrafe = mc.thePlayer.movementInput.moveStrafe;
+   }
+
+   private float[] calculateCenter2ModeRotations() {
+      if (this.blockInfo == null) {
+         return null;
+      }
+
+      BlockPos blockPos = this.blockInfo.blockPos;
+      EnumFacing facing = this.blockInfo.enumFacing;
+
+      // Aim at the exact center of the clicked face on the existing block,
+      // which is also the center of the touching face of the block being placed.
+      double aimX = blockPos.getX() + 0.5 + facing.getFrontOffsetX() * 0.5;
+      double aimY = blockPos.getY() + 0.5 + facing.getFrontOffsetY() * 0.5;
+      double aimZ = blockPos.getZ() + 0.5 + facing.getFrontOffsetZ() * 0.5;
+
+      Vec3 targetVec = new Vec3(aimX, aimY, aimZ);
+      float[] rot = RotationUtils.getRotations(targetVec);
+
+      // Verify the rotation actually hits the intended face via rayTrace
+      MovingObjectPosition mop = RotationUtils.rayTraceCustom(
+         mc.playerController.getBlockReachDistance(), rot[0], rot[1]
+      );
+
+      if (mop != null
+          && mop.typeOfHit == MovingObjectPosition.MovingObjectType.BLOCK
+          && mop.getBlockPos().equals(blockPos)
+          && mop.sideHit == facing) {
+         return rot;
+      }
+
+      // Fallback to standard lookAt calculation
+      Vec3 lookAt = new Vec3(
+         this.targetBlock.xCoord - this.lookVec.xCoord,
+         this.targetBlock.yCoord - this.lookVec.yCoord,
+         this.targetBlock.zCoord - this.lookVec.zCoord
+      );
+      return RotationUtils.getRotations(lookAt);
    }
 
    private float[] calculateCenterModeRotations() {
