@@ -65,6 +65,7 @@ import org.lwjgl.input.Mouse;
 public class KillAura extends Module {
    private SliderSetting aps;
    public SliderSetting autoBlockMode;
+   private SliderSetting blinkTicks;
    private SliderSetting fov;
    private SliderSetting attackRange;
    private SliderSetting swingRange;
@@ -87,7 +88,7 @@ public class KillAura extends Module {
    private ButtonSetting requireMouseDown;
    private ButtonSetting silentSwing;
    private ButtonSetting weaponOnly;
-   private String[] autoBlockModes = new String[]{"Manual", "Vanilla", "Partial", "Interact A", "Interact B", "Swap", "Hypixel", "Hypixel 2"};
+   private String[] autoBlockModes = new String[]{"Manual", "Vanilla", "Partial", "Interact A", "Interact B", "Swap", "Hypixel", "Hypixel 2", "Blink"};
    private String[] rotationModes = new String[]{"Silent", "Lock view", "None"};
    private String[] rotateModes = new String[]{"Attack", "Swing"};
    private String[] sortModes = new String[]{"Distance", "Health", "Hurttime", "Yaw"};
@@ -108,6 +109,8 @@ public class KillAura extends Module {
    public boolean hasBlocked;
    private boolean swapped;
    public boolean blink;
+   private int blinkTickCounter = 0;
+   private boolean isBlinking = false;
    private long lastTime = 0L;
    private long delay;
    private boolean shouldAttack;
@@ -135,6 +138,7 @@ public class KillAura extends Module {
       super("KillAura", Module.category.combat);
       this.registerSetting(this.aps = new SliderSetting("APS", 16.0, 1.0, 20.0, 0.5));
       this.registerSetting(this.autoBlockMode = new SliderSetting("Autoblock", 0, this.autoBlockModes));
+      this.registerSetting(this.blinkTicks = new SliderSetting("Blink ticks", 2.0, 2.0, 6.0, 1.0));
       this.registerSetting(this.fov = new SliderSetting("FOV", 360.0, 30.0, 360.0, 4.0));
       this.registerSetting(this.attackRange = new SliderSetting("Range (attack)", 3.0, 3.0, 6.0, 0.05));
       this.registerSetting(this.swingRange = new SliderSetting("Range (swing)", 3.3, 3.0, 8.0, 0.05));
@@ -180,6 +184,11 @@ public class KillAura extends Module {
       }
 
       this.blink = false;
+      this.blinkTickCounter = 0;
+      if (this.isBlinking) {
+         BlinkHandler.release();
+         this.isBlinking = false;
+      }
       this.interactTicks = 0;
       this.setTarget(null);
       if (this.rotated || this.reset) {
@@ -1046,6 +1055,32 @@ public class KillAura extends Module {
             this.interactTicks++;
             this.sendBlockPacket();
             BlinkHandler.release();
+            break;
+         case 8:
+            // Blink autoblock mode
+            this.blockingClient = true;
+            switch (this.blinkTickCounter) {
+               case 0:
+                  // Send block packet and start blink
+                  this.sendBlockPacket();
+                  BlinkHandler.release();
+                  this.isBlinking = true;
+                  this.blink = true;
+                  break;
+               case 1:
+                  // Keep blinking (packets are being queued)
+                  break;
+            }
+
+            this.blinkTickCounter++;
+
+            if (this.blinkTickCounter >= (int)this.blinkTicks.getInput()) {
+               // Release blink and reset counter
+               BlinkHandler.release();
+               this.isBlinking = false;
+               this.blinkTickCounter = 0;
+            }
+            break;
       }
    }
 
@@ -1323,6 +1358,11 @@ public class KillAura extends Module {
    public void resetAutoblock(boolean unblock) {
       if (this.hasAutoblocked) {
          this.blink = false;
+         this.blinkTickCounter = 0;
+         if (this.isBlinking) {
+            BlinkHandler.release();
+            this.isBlinking = false;
+         }
          if (keystrokesmod.Raven.packetsHandler.playerSlot.get() != mc.thePlayer.inventory.currentItem && this.swapped) {
             mc.thePlayer.sendQueue.addToSendQueue(new C09PacketHeldItemChange(mc.thePlayer.inventory.currentItem));
             keystrokesmod.Raven.packetsHandler.playerSlot.set(mc.thePlayer.inventory.currentItem);

@@ -1342,6 +1342,15 @@ public class Scaffold extends Module {
       return info;
    }
 
+   // Getters for AimVisualizer
+   public Vec3 getTargetBlock() {
+      return this.targetBlock;
+   }
+
+   public float[] getBlockRotations() {
+      return this.blockRotations;
+   }
+
    public boolean stopFastPlace() {
       return this.isEnabled();
    }

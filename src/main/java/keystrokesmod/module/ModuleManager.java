@@ -76,6 +76,7 @@ import keystrokesmod.module.impl.player.Safewalk;
 import keystrokesmod.module.impl.player.Scaffold;
 import keystrokesmod.module.impl.player.Tower;
 import keystrokesmod.module.impl.player.WaterBucket;
+import keystrokesmod.module.impl.render.AimVisualizer;
 import keystrokesmod.module.impl.render.AntiDebuff;
 import keystrokesmod.module.impl.render.AntiShuffle;
 import keystrokesmod.module.impl.render.Arrows;
@@ -165,6 +166,7 @@ public class ModuleManager {
    public static Momentum momentum;
 
    public void register() {
+      this.addModule(new AimVisualizer());
       this.addModule(autoClicker = new AutoClicker());
       this.addModule(LongJump = new LongJump());
       this.addModule(new AimAssist());
