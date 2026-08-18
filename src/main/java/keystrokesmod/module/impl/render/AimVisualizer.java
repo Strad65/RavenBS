@@ -56,20 +56,9 @@ public class AimVisualizer extends Module {
 
       // Render Scaffold aim
       if (this.scaffoldAim.isToggled() && ModuleManager.scaffold != null && ModuleManager.scaffold.isEnabled) {
-         Vec3 targetBlock = ModuleManager.scaffold.getTargetBlock();
-         float[] blockRots = ModuleManager.scaffold.getBlockRotations();
-         if (targetBlock != null && blockRots != null) {
-            // Calculate the hit point using current rotations
-            float[] rots = blockRots;
-            double reach = 4.5;
-            Vec3 lookVec = RotationUtils.getVectorForRotation(rots[1], rots[0]);
-            Vec3 aimPoint = eyePos.addVector(
-               lookVec.xCoord * reach,
-               lookVec.yCoord * reach,
-               lookVec.zCoord * reach
-            );
-
-            this.renderAimPoint(eyePos, aimPoint, partialTicks);
+         Vec3 hitVec = ModuleManager.scaffold.getHitVec();
+         if (hitVec != null) {
+            this.renderAimPoint(eyePos, hitVec, partialTicks);
          }
       }
    }
