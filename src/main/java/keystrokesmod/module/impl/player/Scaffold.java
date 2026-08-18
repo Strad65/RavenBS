@@ -57,6 +57,7 @@ public class Scaffold extends Module {
    private SliderSetting floatFirstJump;
    public SliderSetting fastScaffold;
    private SliderSetting multiPlace;
+   private SliderSetting rotationSpeed;
    public ButtonSetting autoSwap;
    private ButtonSetting fastOnRMB;
    public ButtonSetting highlightBlocks;
@@ -217,6 +218,7 @@ public class Scaffold extends Module {
       this.registerSetting(this.floatFirstJump = new SliderSetting("§eFloat §rfirst jump speed", "%", 100.0, 50.0, 100.0, 1.0));
       this.registerSetting(this.fastScaffold = new SliderSetting("Fast scaffold", 0, this.fastScaffoldModes));
       this.registerSetting(this.multiPlace = new SliderSetting("Multi-place", 0, this.multiPlaceModes));
+      this.registerSetting(this.rotationSpeed = new SliderSetting("Rotation speed", "°/t", 180.0, 1.0, 180.0, 1.0));
       this.registerSetting(this.autoSwap = new ButtonSetting("Auto swap", true));
       this.registerSetting(this.fastOnRMB = new ButtonSetting("Fast on RMB", true));
       this.registerSetting(this.highlightBlocks = new ButtonSetting("Highlight blocks", true));
@@ -320,8 +322,14 @@ public class Scaffold extends Module {
                } else if (this.fakeRotation.getInput() == 3.0) {
                   this.fakeYaw2 = mc.thePlayer.rotationYaw - this.hardcodedYaw();
                   float yawDifference = Utils.getAngleDifference(this.lastEdge2, this.fakeYaw2);
-                  float smoothingFactor = 0.35F;
-                  this.fakeYaw2 = this.lastEdge2 + yawDifference * smoothingFactor;
+
+                  // Apply rotation speed limit
+                  float maxRotation = (float)this.rotationSpeed.getInput();
+                  if (Math.abs(yawDifference) > maxRotation) {
+                     yawDifference = Math.copySign(maxRotation, yawDifference);
+                  }
+
+                  this.fakeYaw2 = this.lastEdge2 + yawDifference;
                   this.lastEdge2 = this.fakeYaw2;
                   this.fakeYaw = this.fakeYaw2;
                   if (this.blockRotations != null) {
@@ -342,8 +350,14 @@ public class Scaffold extends Module {
                   }
 
                   float yawDifference = Utils.getAngleDifference(this.lastEdge2, this.fakeYaw2);
-                  float smoothingFactor = 0.35F;
-                  this.fakeYaw2 = this.lastEdge2 + yawDifference * smoothingFactor;
+
+                  // Apply rotation speed limit
+                  float maxRotation = (float)this.rotationSpeed.getInput();
+                  if (Math.abs(yawDifference) > maxRotation) {
+                     yawDifference = Math.copySign(maxRotation, yawDifference);
+                  }
+
+                  this.fakeYaw2 = this.lastEdge2 + yawDifference;
                   this.lastEdge2 = this.fakeYaw2;
                   this.fakeYaw = this.fakeYaw2;
                }
@@ -660,8 +674,14 @@ public class Scaffold extends Module {
          if ((!(dif >= 0.0) || !(dif < v)) && (!(dif <= 0.0) || !(dif > -v)) && !mc.thePlayer.onGround) {
             this.getSmooth = this.yaw;
             float yawDifference = Utils.getAngleDifference(this.lastYawS, this.getSmooth);
-            float smoothingFactor = 0.1F;
-            this.getSmooth = this.lastYawS + yawDifference * smoothingFactor;
+
+            // Apply rotation speed limit
+            float maxRotation = (float)this.rotationSpeed.getInput();
+            if (Math.abs(yawDifference) > maxRotation) {
+               yawDifference = Math.copySign(maxRotation, yawDifference);
+            }
+
+            this.getSmooth = this.lastYawS + yawDifference;
             this.lastYawS = this.getSmooth;
             this.smoothedYaw = this.getSmooth;
             this.yaw = this.smoothedYaw;
