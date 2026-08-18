@@ -1555,9 +1555,14 @@ public class Scaffold extends Module {
          int blockZ = blockInfo2.blockPos.getZ();
          EnumFacing blockFacing = blockInfo2.enumFacing;
          this.blockInfo = blockInfo2;
-         double hitX = blockX + 0.5 + this.getCoord(blockFacing.getOpposite(), "x") * 0.5;
-         double hitY = blockY + 0.5 + this.getCoord(blockFacing.getOpposite(), "y") * 0.5;
-         double hitZ = blockZ + 0.5 + this.getCoord(blockFacing.getOpposite(), "z") * 0.5;
+
+         // Center2 mode aims at the center of the clicked face on the existing block
+         boolean useCenter2 = this.rotation.getInput() == 5.0;
+         EnumFacing hitFacing = useCenter2 ? blockFacing : blockFacing.getOpposite();
+
+         double hitX = blockX + 0.5 + this.getCoord(hitFacing, "x") * 0.5;
+         double hitY = blockY + 0.5 + this.getCoord(hitFacing, "y") * 0.5;
+         double hitZ = blockZ + 0.5 + this.getCoord(hitFacing, "z") * 0.5;
          this.lookVec = new Vec3(
             0.5 + this.getCoord(blockFacing.getOpposite(), "x") * 0.5,
             0.5 + this.getCoord(blockFacing.getOpposite(), "y") * 0.5,
