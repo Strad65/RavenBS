@@ -17,12 +17,21 @@ import keystrokesmod.event.PreUpdateEvent;
 import keystrokesmod.event.SlotUpdateEvent;
 import keystrokesmod.mixin.impl.accessor.IAccessorEntityPlayerSP;
 import keystrokesmod.mixin.interfaces.IMixinItemRenderer;
+import java.awt.Color;
+import java.io.IOException;
 import keystrokesmod.module.Module;
 import keystrokesmod.module.ModuleManager;
 import keystrokesmod.module.impl.client.Settings;
 import keystrokesmod.module.impl.movement.LongJump;
 import keystrokesmod.module.setting.impl.ButtonSetting;
 import keystrokesmod.module.setting.impl.SliderSetting;
+import keystrokesmod.utility.shader.BlurUtils;
+import net.minecraft.client.gui.Gui;
+import net.minecraft.client.gui.GuiButton;
+import net.minecraft.client.gui.GuiScreen;
+import net.minecraft.client.gui.ScaledResolution;
+import net.minecraftforge.fml.client.config.GuiButtonExt;
+import org.lwjgl.opengl.GL11;
 import keystrokesmod.utility.BlinkHandler;
 import keystrokesmod.utility.BlockUtils;
 import keystrokesmod.utility.ModuleUtils;
@@ -64,6 +73,9 @@ public class Scaffold extends Module {
    public ButtonSetting jumpFacingForward;
    public ButtonSetting safeWalk;
    public ButtonSetting showBlockCount;
+   public SliderSetting blockCountBlur;
+   public int blockCountPosX = 0;
+   public int blockCountPosY = 0;
    private ButtonSetting silentSwing;
    private ButtonSetting prioritizeSprintWithSpeed;
    private String[] rotationModes = new String[]{"§cDisabled", "Simple", "Offset", "Precise", "Center", "Center2"};
@@ -225,6 +237,8 @@ public class Scaffold extends Module {
       this.registerSetting(this.jumpFacingForward = new ButtonSetting("Jump facing forward", false));
       this.registerSetting(this.safeWalk = new ButtonSetting("Safewalk", true));
       this.registerSetting(this.showBlockCount = new ButtonSetting("Show block count", true));
+      this.registerSetting(this.blockCountBlur = new SliderSetting("Block count blur", "px", 3.0, 0.0, 10.0, 0.5));
+      this.registerSetting(new ButtonSetting("Edit block count pos", () -> mc.displayGuiScreen(new Scaffold.BlockCountEditScreen())));
       this.registerSetting(this.silentSwing = new ButtonSetting("Silent swing", false));
       this.alwaysOn = true;
    }
@@ -233,6 +247,8 @@ public class Scaffold extends Module {
    public void guiUpdate() {
       this.prioritizeSprintWithSpeed.setVisible(this.sprint.getInput() > 0.0, this);
       this.floatFirstJump.setVisible(this.sprint.getInput() == 2.0, this);
+      boolean showBC = this.showBlockCount.isToggled();
+      this.blockCountBlur.setVisible(showBC, this);
    }
 
    @Override
@@ -1942,6 +1958,115 @@ public class Scaffold extends Module {
 
       this.blockSlot = -1;
       return false;
+   }
+
+   class BlockCountEditScreen extends GuiScreen {
+      private GuiButtonExt resetPosition;
+      private boolean dragging = false;
+      private int aX = 0, aY = 0;
+      private int laX = 0, laY = 0, lmX = 0, lmY = 0;
+      private int bgX1, bgY1, bgX2, bgY2;
+
+      @Override
+      public void initGui() {
+         super.initGui();
+         this.buttonList.add(this.resetPosition = new GuiButtonExt(1, this.width - 90, this.height - 25, 85, 20, "Reset position"));
+         this.aX = Scaffold.this.blockCountPosX;
+         this.aY = Scaffold.this.blockCountPosY;
+      }
+
+      @Override
+      public void drawScreen(int mX, int mY, float pt) {
+         ScaledResolution res = new ScaledResolution(mc);
+         drawRect(0, 0, this.width, this.height, -1308622848);
+
+         int blocks = Scaffold.this.totalBlocks();
+         String text = keystrokesmod.utility.ScaffoldBlockCount.buildText(blocks);
+         int x = res.getScaledWidth() / 2 + 8 + this.aX;
+         int y = res.getScaledHeight() / 2 + 4 + this.aY;
+         int textWidth = mc.fontRendererObj.getStringWidth(text);
+         int PAD = 3;
+         this.bgX1 = x - PAD;
+         this.bgY1 = y - PAD;
+         this.bgX2 = x + textWidth + PAD;
+         this.bgY2 = y + mc.fontRendererObj.FONT_HEIGHT + PAD;
+
+         Scaffold.this.blockCountPosX = this.aX;
+         Scaffold.this.blockCountPosY = this.aY;
+
+         // Blur background
+         float blurR = (float) Scaffold.this.blockCountBlur.getInput();
+         int bgAlpha = 199;
+         if (blurR > 0.0f) {
+            BlurUtils.blurRect(this.bgX1, this.bgY1, this.bgX2 - this.bgX1, this.bgY2 - this.bgY1, 2, blurR);
+         } else {
+            GL11.glPushMatrix();
+            GL11.glEnable(3042);
+            GL11.glBlendFunc(770, 771);
+            Gui.drawRect(this.bgX1, this.bgY1, this.bgX2, this.bgY2, new Color(0, 0, 0, bgAlpha).getRGB());
+            GL11.glDisable(3042);
+            GL11.glPopMatrix();
+         }
+
+         // Text
+         GL11.glPushMatrix();
+         GL11.glEnable(3042);
+         GL11.glBlendFunc(770, 771);
+         mc.fontRendererObj.drawStringWithShadow(text, x, y, -1);
+         GL11.glDisable(3042);
+         GL11.glPopMatrix();
+
+         // Hint
+         String hint = "Drag to reposition the block count display.";
+         int hx = res.getScaledWidth() / 2 - mc.fontRendererObj.getStringWidth(hint) / 2;
+         int hy = res.getScaledHeight() / 2 - 20;
+         mc.fontRendererObj.drawString(hint, hx, hy, 0xFFAAAAAA);
+
+         try {
+            this.handleInput();
+         } catch (IOException e) {
+         }
+
+         super.drawScreen(mX, mY, pt);
+      }
+
+      @Override
+      protected void mouseClickMove(int mX, int mY, int b, long t) {
+         super.mouseClickMove(mX, mY, b, t);
+         if (b == 0) {
+            if (this.dragging) {
+               this.aX = this.laX + (mX - this.lmX);
+               this.aY = this.laY + (mY - this.lmY);
+            } else if (mX >= this.bgX1 && mX <= this.bgX2 && mY >= this.bgY1 && mY <= this.bgY2) {
+               this.dragging = true;
+               this.lmX = mX;
+               this.lmY = mY;
+               this.laX = this.aX;
+               this.laY = this.aY;
+            }
+         }
+      }
+
+      @Override
+      protected void mouseReleased(int mX, int mY, int s) {
+         super.mouseReleased(mX, mY, s);
+         if (s == 0) {
+            this.dragging = false;
+         }
+      }
+
+      @Override
+      public void actionPerformed(GuiButton b) {
+         if (b == this.resetPosition) {
+            this.aX = Scaffold.this.blockCountPosX = 0;
+            this.aY = Scaffold.this.blockCountPosY = 0;
+         }
+      }
+
+      @Override
+      public boolean doesGuiPauseGame() {
+         return false;
+      }
    }
 
    static class PlaceData {

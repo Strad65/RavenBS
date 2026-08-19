@@ -1,7 +1,10 @@
 package keystrokesmod.utility;
 
+import java.awt.Color;
 import keystrokesmod.module.ModuleManager;
+import keystrokesmod.utility.shader.BlurUtils;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Gui;
 import net.minecraft.client.gui.ScaledResolution;
 import net.minecraftforge.fml.common.FMLCommonHandler;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
@@ -14,11 +17,27 @@ public class ScaffoldBlockCount {
    public static Timer fadeTimer;
    public static Timer fadeInTimer;
    private float previousAlpha;
+   private static final int PAD = 3;
 
    public ScaffoldBlockCount(Minecraft mc) {
       this.mc = mc;
       fadeTimer = null;
       (fadeInTimer = new Timer(150.0F)).start();
+   }
+
+   /** Build the display string for the given block count. */
+   public static String buildText(int blocks) {
+      String color;
+      if (blocks <= 5) {
+         color = "§c";
+      } else if (blocks <= 15) {
+         color = "§6";
+      } else if (blocks <= 25) {
+         color = "§e";
+      } else {
+         color = "";
+      }
+      return color + blocks + " §rblock" + (blocks == 1 ? "" : "s");
    }
 
    @SubscribeEvent
@@ -33,16 +52,6 @@ public class ScaffoldBlockCount {
 
             ScaledResolution scaledResolution = new ScaledResolution(this.mc);
             int blocks = ModuleManager.scaffold.totalBlocks();
-            String color = "§";
-            if (blocks <= 5) {
-               color = color + "c";
-            } else if (blocks <= 15) {
-               color = color + "6";
-            } else if (blocks <= 25) {
-               color = color + "e";
-            } else {
-               color = "";
-            }
 
             float alpha = fadeTimer == null ? 255.0F : 255 - fadeTimer.getValueInt(0, 255, 1);
             if (fadeInTimer != null) {
@@ -53,22 +62,51 @@ public class ScaffoldBlockCount {
             }
 
             this.previousAlpha = alpha;
-            int colorAlpha = Utils.mergeAlpha(-1, (int)this.previousAlpha);
-            GL11.glPushMatrix();
-            GL11.glEnable(3042);
-            GL11.glBlendFunc(770, 771);
-            this.mc
-               .fontRendererObj
-               .drawStringWithShadow(
-                  color + blocks + " §rblock" + (blocks == 1 ? "" : "s"),
-                  scaledResolution.getScaledWidth() / 2 + 8,
-                  scaledResolution.getScaledHeight() / 2 + 4,
-                  colorAlpha
-               );
-            GL11.glDisable(3042);
-            GL11.glPopMatrix();
+            this.drawBlockCountHUD(scaledResolution, blocks, alpha,
+                  ModuleManager.scaffold.blockCountPosX,
+                  ModuleManager.scaffold.blockCountPosY);
          }
       }
+   }
+
+   /**
+    * Renders the block-count HUD at the given screen position offset.
+    * Called both from onRenderTick and from Scaffold's BlockCountEditScreen preview.
+    */
+   public void drawBlockCountHUD(ScaledResolution res, int blocks, float alpha, int offsetX, int offsetY) {
+      String text = buildText(blocks);
+      int x = res.getScaledWidth() / 2 + 8 + offsetX;
+      int y = res.getScaledHeight() / 2 + 4 + offsetY;
+      int textWidth = this.mc.fontRendererObj.getStringWidth(text);
+      int bgX1 = x - PAD;
+      int bgY1 = y - PAD;
+      int bgX2 = x + textWidth + PAD;
+      int bgY2 = y + this.mc.fontRendererObj.FONT_HEIGHT + PAD;
+
+      // Blur background
+      float blurRadius = (float) ModuleManager.scaffold.blockCountBlur.getInput();
+      int bgAlpha = (int)(alpha * 0.78f);
+      if (blurRadius > 0.0f) {
+         // Mask the blurred game scene to this rect (sharp corners)
+         BlurUtils.blurRect(bgX1, bgY1, bgX2 - bgX1, bgY2 - bgY1, 2, blurRadius);
+      } else {
+         // No blur — draw a plain translucent rect
+         GL11.glPushMatrix();
+         GL11.glEnable(3042);
+         GL11.glBlendFunc(770, 771);
+         Gui.drawRect(bgX1, bgY1, bgX2, bgY2, new Color(0, 0, 0, bgAlpha).getRGB());
+         GL11.glDisable(3042);
+         GL11.glPopMatrix();
+      }
+
+      // Text
+      int colorAlpha = Utils.mergeAlpha(-1, (int)alpha);
+      GL11.glPushMatrix();
+      GL11.glEnable(3042);
+      GL11.glBlendFunc(770, 771);
+      this.mc.fontRendererObj.drawStringWithShadow(text, x, y, colorAlpha);
+      GL11.glDisable(3042);
+      GL11.glPopMatrix();
    }
 
    public void beginFade() {

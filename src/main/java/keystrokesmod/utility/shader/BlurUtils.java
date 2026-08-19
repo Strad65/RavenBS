@@ -28,4 +28,22 @@ public class BlurUtils {
       stencilFrameBufferBloom.unbindFramebuffer();
       KawaseBloom.renderBlur(stencilFrameBufferBloom.framebufferTexture, passes, radius);
    }
+
+   /**
+    * Renders a blurred background rectangle (no rounded corners).
+    * The blurred area shows the game scene blurred, masked to the given rect.
+    *
+    * @param x      left edge in GUI coordinates
+    * @param y      top edge in GUI coordinates
+    * @param width  width in GUI coordinates
+    * @param height height in GUI coordinates
+    * @param passes Kawase blur pass count (2 is typical)
+    * @param radius blur radius in pixels
+    */
+   public static void blurRect(float x, float y, float width, float height, int passes, float radius) {
+      if (radius <= 0) return;
+      prepareBlur();
+      RoundedUtils.drawRound(x, y, width, height, 0.0F, new java.awt.Color(0, 0, 0, 255));
+      blurEnd(passes, radius);
+   }
 }
