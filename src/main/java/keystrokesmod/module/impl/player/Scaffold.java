@@ -1056,6 +1056,7 @@ public class Scaffold extends Module {
    }
 
 
+   private void centerRots(ClientRotationEvent e) {
       // If Fast on RMB is enabled and RMB not held -> behave like Simple
       if (this.fastOnRMB.isToggled() && !this.fastOnRMB()) {
          this.simpleRots(e);

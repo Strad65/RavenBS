@@ -87,3 +87,67 @@ src/main/resources/             mcmod.info、mixins.raven.json、assets
 `mixins.raven.json` 列出 41 个 mixin,但源码里有 44 个:
 `IAccessorItemRenderer`、`MixinGuiIngame`、`MixinGuiIngameForge` 未被注册。
 原 jar 也是如此,属于原作者留下的死代码,已按原样保留。
+
+## 后续开发经验
+
+### AimVisualizer 模块
+
+新增 `AimVisualizer` 模块(render 分类),用于可视化 KillAura 和 Scaffold 的服务端瞄准点:
+
+- **KillAura**:在当前攻击目标位置渲染一条射线 + 圆点
+- **Scaffold**:渲染当前瞄准点的射线,并将历史点以圆点形式持久保留,过期时间由 `scaffoldHistoryTime` 滑块控制(0–10000 ms,默认 2000 ms)
+- `onDisable()` 时清空历史队列
+- 在 `ModuleManager` 中注册该模块
+
+### Scaffold — Center2 旋转模式
+
+在 Scaffold 的旋转模式数组中新增 `Center2`(index 5),瞄准行为:
+
+- 瞄准点 = 旧方块中心 + `blockFacing` 方向上 ±0.5 的偏移,即被点击面的中心(面上,不是偏移 0.5 进新方块)
+- 与 `Center` 的区别:`Center` 使用 `backwardsYaw`(反向)而 `Center2` 使用精确指向该面的 yaw
+- hitVec 公式:`blockX + 0.5 + getCoord(blockFacing, "x")` —— **不**加 `* 0.5`,否则坐标会落在面内而非面上
+- 使用 `getRotationsToWorldPoint()` 而非 `RotationUtils.getRotations(Vec3)`,因为后者对每个坐标多加了 `+1.0`(为角坐标设计),对世界坐标会导致 rayTrace 始终失败
+
+**关键陷阱:`RotationUtils.getRotations(Vec3)` 的 +1.0 偏置**
+
+```java
+// RotationUtils.getRotations(Vec3 vec) 内部:
+double dx = vec.xCoord + 1.0 - player.posX;  // ← +1.0 是针对方块角坐标的
+```
+
+对精确世界坐标(如面中心)必须绕过这个方法,改用直接 atan2 计算:
+
+```java
+private float[] getRotationsToWorldPoint(double worldX, double worldY, double worldZ) {
+    double dx = worldX - mc.thePlayer.posX;
+    double dy = worldY - (mc.thePlayer.posY + mc.thePlayer.getEyeHeight());
+    double dz = worldZ - mc.thePlayer.posZ;
+    float yaw = (float)(Math.atan2(dz, dx) * (180.0 / Math.PI)) - 90.0F;
+    yaw = mc.thePlayer.rotationYaw + MathHelper.wrapAngleTo180_float(yaw - mc.thePlayer.rotationYaw);
+    float pitch = (float)(-(Math.atan2(dy, Math.sqrt(dx*dx + dz*dz)) * (180.0 / Math.PI)));
+    return new float[]{yaw, MathHelper.clamp_float(pitch, -90.0F, 90.0F)};
+}
+```
+
+**`centerRots()` 的 yaw 问题**
+
+原 `centerRots()` 使用 `backwardsYaw = rotationYaw - hardcodedYaw()`,这是背对移动方向的 yaw,与被点击的方块无关。GrimAC 的 RotationPlace 检测会对这个 yaw 做 rayTrace 验证,背向 yaw 必然失败。`Center2` 改为使用 `blockRotations[0]`(由 `calculateCenter2ModeRotations()` 算出的精确 yaw),rayTrace 能命中目标面。
+
+### Scaffold — 旋转速度滑块
+
+新增 `rotationSpeed` SliderSetting(1–180 °/tick,默认 180),在 `handleV()` 中限制每 tick 的 yaw 变化量:
+
+```java
+float yawDifference = Utils.getAngleDifference(this.lastYawS, this.getSmooth);
+float maxRotation = (float)this.rotationSpeed.getInput();
+if (Math.abs(yawDifference) > maxRotation) {
+    yawDifference = Math.copySign(maxRotation, yawDifference);
+}
+this.getSmooth = this.lastYawS + yawDifference;
+```
+
+### 构建排错
+
+**brace mismatch 排查方法**:错误 "需要class, interface或enum" 出现在方法体语句上,意味着该语句处于类级别而非方法内部——即前面某个方法缺少开头的 `{` 或多了一个 `}`。定位方法:找到第一条报错行,向上找最近一个应有方法签名的位置,检查签名是否完整。
+
+本次具体原因:Edit 操作的 `old_string` 只匹配了 `private void centerRots(ClientRotationEvent e) {` 这一行,`new_string` 末尾重复写了这行作为新方法的开头,但实际替换后原方法签名消失,方法体变成孤立代码。修复时只需在孤立方法体前补回签名即可。
