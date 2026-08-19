@@ -562,7 +562,7 @@ public class Scaffold extends Module {
                   this.centerRots(e);
                   break;
                case 5:
-                  this.centerRots(e);
+                  this.center2Rots(e);
                   break;
             }
 
@@ -1034,7 +1034,28 @@ public class Scaffold extends Module {
       this.theYaw = this.yaw;
    }
 
-   private void centerRots(ClientRotationEvent e) {
+   private void center2Rots(ClientRotationEvent e) {
+      if (this.fastOnRMB.isToggled() && !this.fastOnRMB()) {
+         this.simpleRots(e);
+         return;
+      }
+
+      // Use the exact rotation computed to face the block's clicked face center.
+      // blockRotations[0] is the precise yaw that passes GrimAC RotationPlace rayTrace.
+      if (this.blockRotations != null) {
+         this.yaw = this.blockRotations[0];
+         this.pitch = this.blockRotations[1];
+      } else {
+         this.yaw = mc.thePlayer.rotationYaw - this.hardcodedYaw();
+         this.pitch = 85.0F;
+      }
+
+      e.setRotations(this.yaw, this.pitch);
+      this.theYaw = this.yaw;
+      this.applyCenterMoveFix(this.yaw);
+   }
+
+
       // If Fast on RMB is enabled and RMB not held -> behave like Simple
       if (this.fastOnRMB.isToggled() && !this.fastOnRMB()) {
          this.simpleRots(e);
