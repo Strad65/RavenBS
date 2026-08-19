@@ -1097,14 +1097,16 @@ public class Scaffold extends Module {
       BlockPos blockPos = this.blockInfo.blockPos;
       EnumFacing facing = this.blockInfo.enumFacing;
 
-      // Aim at the exact center of the clicked face on the existing block,
-      // which is also the center of the touching face of the block being placed.
-      double aimX = blockPos.getX() + 0.5 + facing.getFrontOffsetX() * 0.5;
-      double aimY = blockPos.getY() + 0.5 + facing.getFrontOffsetY() * 0.5;
-      double aimZ = blockPos.getZ() + 0.5 + facing.getFrontOffsetZ() * 0.5;
+      // Exact center of the clicked face on the existing block.
+      // getCoord() returns ±0.5 for the relevant axis, 0.0 otherwise.
+      double aimX = blockPos.getX() + 0.5 + this.getCoord(facing, "x");
+      double aimY = blockPos.getY() + 0.5 + this.getCoord(facing, "y");
+      double aimZ = blockPos.getZ() + 0.5 + this.getCoord(facing, "z");
 
-      Vec3 targetVec = new Vec3(aimX, aimY, aimZ);
-      float[] rot = RotationUtils.getRotations(targetVec);
+      // Compute rotation directly to an exact world coordinate.
+      // We must NOT use RotationUtils.getRotations(Vec3) here because that
+      // method adds +1.0 to every coordinate (designed for block-corner input).
+      float[] rot = getRotationsToWorldPoint(aimX, aimY, aimZ);
 
       // Verify the rotation actually hits the intended face via rayTrace
       MovingObjectPosition mop = RotationUtils.rayTraceCustom(
@@ -1118,13 +1120,28 @@ public class Scaffold extends Module {
          return rot;
       }
 
-      // Fallback to standard lookAt calculation
+      // Fallback: standard lookAt calculation
       Vec3 lookAt = new Vec3(
          this.targetBlock.xCoord - this.lookVec.xCoord,
          this.targetBlock.yCoord - this.lookVec.yCoord,
          this.targetBlock.zCoord - this.lookVec.zCoord
       );
       return RotationUtils.getRotations(lookAt);
+   }
+
+   /**
+    * Compute yaw/pitch to aim at an exact world coordinate.
+    * Unlike RotationUtils.getRotations(Vec3), this does not apply any +1.0 offset.
+    */
+   private float[] getRotationsToWorldPoint(double worldX, double worldY, double worldZ) {
+      double dx = worldX - mc.thePlayer.posX;
+      double dy = worldY - (mc.thePlayer.posY + mc.thePlayer.getEyeHeight());
+      double dz = worldZ - mc.thePlayer.posZ;
+      float yaw = (float)(Math.atan2(dz, dx) * (180.0 / Math.PI)) - 90.0F;
+      yaw = mc.thePlayer.rotationYaw + MathHelper.wrapAngleTo180_float(yaw - mc.thePlayer.rotationYaw);
+      float pitch = (float)(-(Math.atan2(dy, Math.sqrt(dx * dx + dz * dz)) * (180.0 / Math.PI)));
+      pitch = MathHelper.clamp_float(pitch, -90.0F, 90.0F);
+      return new float[]{yaw, pitch};
    }
 
    private float[] calculateCenterModeRotations() {
