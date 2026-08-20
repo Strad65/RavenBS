@@ -46,4 +46,22 @@ public class BlurUtils {
       RoundedUtils.drawRound(x, y, width, height, 0.0F, new java.awt.Color(0, 0, 0, 255));
       blurEnd(passes, radius);
    }
+
+   /**
+    * Renders a bloom/shadow effect around a rectangle (no rounded corners).
+    *
+    * @param x      left edge in GUI coordinates
+    * @param y      top edge in GUI coordinates
+    * @param width  width in GUI coordinates
+    * @param height height in GUI coordinates
+    * @param passes Kawase bloom pass count (3 is typical)
+    * @param radius bloom radius in pixels
+    * @param color  bloom color (typically semi-transparent black for shadow)
+    */
+   public static void bloomRect(float x, float y, float width, float height, int passes, float radius, java.awt.Color color) {
+      if (radius <= 0) return;
+      prepareBloom();
+      RoundedUtils.drawRound(x, y, width, height, 0.0F, color);
+      bloomEnd(passes, radius);
+   }
 }

@@ -75,6 +75,8 @@ public class Scaffold extends Module {
    public ButtonSetting showBlockCount;
    public ButtonSetting blockCountBlurToggle;
    public SliderSetting blockCountBlur;
+   public ButtonSetting blockCountBloomToggle;
+   public SliderSetting blockCountBloom;
    public int blockCountPosX = 0;
    public int blockCountPosY = 0;
    private ButtonSetting silentSwing;
@@ -240,6 +242,8 @@ public class Scaffold extends Module {
       this.registerSetting(this.showBlockCount = new ButtonSetting("Show block count", true));
       this.registerSetting(this.blockCountBlurToggle = new ButtonSetting("Block count blur", false));
       this.registerSetting(this.blockCountBlur = new SliderSetting("Blur radius", "px", 3.0, 0.0, 10.0, 0.5));
+      this.registerSetting(this.blockCountBloomToggle = new ButtonSetting("Block count bloom", false));
+      this.registerSetting(this.blockCountBloom = new SliderSetting("Bloom radius", "px", 2.0, 0.0, 10.0, 0.5));
       this.registerSetting(new ButtonSetting("Edit block count pos", () -> mc.displayGuiScreen(new Scaffold.BlockCountEditScreen())));
       this.registerSetting(this.silentSwing = new ButtonSetting("Silent swing", false));
       this.alwaysOn = true;
@@ -252,6 +256,8 @@ public class Scaffold extends Module {
       boolean showBC = this.showBlockCount.isToggled();
       this.blockCountBlurToggle.setVisible(showBC, this);
       this.blockCountBlur.setVisible(showBC && this.blockCountBlurToggle.isToggled(), this);
+      this.blockCountBloomToggle.setVisible(showBC, this);
+      this.blockCountBloom.setVisible(showBC && this.blockCountBloomToggle.isToggled(), this);
    }
 
    @Override
@@ -1998,6 +2004,15 @@ public class Scaffold extends Module {
 
          Scaffold.this.blockCountPosX = this.aX;
          Scaffold.this.blockCountPosY = this.aY;
+
+         // Bloom/shadow effect
+         boolean bloomEnabled = Scaffold.this.blockCountBloomToggle.isToggled();
+         float bloomR = bloomEnabled ? (float) Scaffold.this.blockCountBloom.getInput() : 0.0f;
+         int bloomAlpha = 110; // Similar to TargetInfo's maxAlphaOutline
+         if (bloomR > 0.0f) {
+            BlurUtils.bloomRect(this.bgX1, this.bgY1, this.bgX2 - this.bgX1, this.bgY2 - this.bgY1, 3, bloomR,
+                                new Color(0, 0, 0, bloomAlpha));
+         }
 
          // Blur background
          boolean blurEnabled = Scaffold.this.blockCountBlurToggle.isToggled();

@@ -83,6 +83,15 @@ public class ScaffoldBlockCount {
       int bgX2 = x + textWidth + PAD;
       int bgY2 = y + this.mc.fontRendererObj.FONT_HEIGHT + PAD;
 
+      // Bloom/shadow effect
+      boolean bloomEnabled = ModuleManager.scaffold.blockCountBloomToggle.isToggled();
+      float bloomRadius = bloomEnabled ? (float) ModuleManager.scaffold.blockCountBloom.getInput() : 0.0f;
+      int bloomAlpha = (int)(alpha * 0.43f); // Similar to TargetInfo's maxAlphaOutline logic
+      if (bloomRadius > 0.0f) {
+         BlurUtils.bloomRect(bgX1, bgY1, bgX2 - bgX1, bgY2 - bgY1, 3, bloomRadius,
+                             new Color(0, 0, 0, bloomAlpha));
+      }
+
       // Blur background
       boolean blurEnabled = ModuleManager.scaffold.blockCountBlurToggle.isToggled();
       float blurRadius = blurEnabled ? (float) ModuleManager.scaffold.blockCountBlur.getInput() : 0.0f;
