@@ -11,6 +11,7 @@ import keystrokesmod.utility.RenderUtils;
 import keystrokesmod.utility.Theme;
 import keystrokesmod.utility.Utils;
 import keystrokesmod.utility.shader.BlurUtils;
+import keystrokesmod.utility.shader.RoundedUtils;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
@@ -118,6 +119,130 @@ public class HUD extends Module {
             int lastXPos = 0;
 
             try {
+               // First pass: render all backgrounds in batch for seamless blur/bloom
+               if (backgroundAlpha.getInput() != 0.0 || backgroundBlur.isToggled() || backgroundBloom.isToggled()) {
+                  boolean needsBloom = backgroundBloom.isToggled();
+                  boolean needsBlur = backgroundBlur.isToggled();
+                  int maxAlphaBackground = a > 210 ? 210 : a;
+
+                  // Bloom pass (if enabled)
+                  if (needsBloom) {
+                     BlurUtils.prepareBloom();
+                     int tempYPos = posY;
+                     for (Module module : ModuleManager.organizedModules) {
+                        if (module.isEnabled()
+                           && module != this
+                           && !module.isHidden()
+                           && module != ModuleManager.commandLine
+                           && (!removeRender.isToggled() || module.moduleCategory() != Module.category.render)
+                           && (!removeScripts.isToggled() || module.moduleCategory() != Module.category.scripts)
+                           && (!removeCloset.isToggled() || !module.closetModule)) {
+                           String moduleName = module.getNameInHud();
+                           if (showInfo.isToggled() && !module.getInfo().isEmpty()) {
+                              moduleName = moduleName + " §7" + module.getInfo();
+                           }
+                           if (lowercase.isToggled()) {
+                              moduleName = moduleName.toLowerCase();
+                           }
+
+                           int xPos = posX;
+                           if (alignRight.isToggled()) {
+                              xPos -= mc.fontRendererObj.getStringWidth(moduleName);
+                           }
+
+                           int bgX1 = xPos - 1;
+                           int bgY1 = tempYPos - 1;
+                           int bgX2 = xPos + mc.fontRendererObj.getStringWidth(moduleName) + 1;
+                           double bgY2 = tempYPos + mc.fontRendererObj.FONT_HEIGHT + gapv - 2.5;
+
+                           RoundedUtils.drawRound(bgX1, bgY1, bgX2 - bgX1, (float)(bgY2 - bgY1), 0.0F,
+                                                  true, new Color(0, 0, 0, maxAlphaBackground));
+
+                           tempYPos = (int)(tempYPos + (mc.fontRendererObj.FONT_HEIGHT + gapv));
+                        }
+                     }
+                     float bloomRadius = (float) backgroundBloomRadius.getInput();
+                     BlurUtils.bloomEnd(3, bloomRadius);
+                  }
+
+                  // Blur pass (if enabled)
+                  if (needsBlur) {
+                     BlurUtils.prepareBlur();
+                     int tempYPos = posY;
+                     for (Module module : ModuleManager.organizedModules) {
+                        if (module.isEnabled()
+                           && module != this
+                           && !module.isHidden()
+                           && module != ModuleManager.commandLine
+                           && (!removeRender.isToggled() || module.moduleCategory() != Module.category.render)
+                           && (!removeScripts.isToggled() || module.moduleCategory() != Module.category.scripts)
+                           && (!removeCloset.isToggled() || !module.closetModule)) {
+                           String moduleName = module.getNameInHud();
+                           if (showInfo.isToggled() && !module.getInfo().isEmpty()) {
+                              moduleName = moduleName + " §7" + module.getInfo();
+                           }
+                           if (lowercase.isToggled()) {
+                              moduleName = moduleName.toLowerCase();
+                           }
+
+                           int xPos = posX;
+                           if (alignRight.isToggled()) {
+                              xPos -= mc.fontRendererObj.getStringWidth(moduleName);
+                           }
+
+                           int bgX1 = xPos - 1;
+                           int bgY1 = tempYPos - 1;
+                           int bgX2 = xPos + mc.fontRendererObj.getStringWidth(moduleName) + 1;
+                           double bgY2 = tempYPos + mc.fontRendererObj.FONT_HEIGHT + gapv - 2.5;
+
+                           RoundedUtils.drawRound(bgX1, bgY1, bgX2 - bgX1, (float)(bgY2 - bgY1), 0.0F,
+                                                  new Color(0, 0, 0, 255));
+
+                           tempYPos = (int)(tempYPos + (mc.fontRendererObj.FONT_HEIGHT + gapv));
+                        }
+                     }
+                     float blurRadius = (float) backgroundBlurRadius.getInput();
+                     BlurUtils.blurEnd(2, blurRadius);
+                  }
+
+                  // Plain background (if no blur/bloom)
+                  if (!needsBlur && !needsBloom) {
+                     int tempYPos = posY;
+                     for (Module module : ModuleManager.organizedModules) {
+                        if (module.isEnabled()
+                           && module != this
+                           && !module.isHidden()
+                           && module != ModuleManager.commandLine
+                           && (!removeRender.isToggled() || module.moduleCategory() != Module.category.render)
+                           && (!removeScripts.isToggled() || module.moduleCategory() != Module.category.scripts)
+                           && (!removeCloset.isToggled() || !module.closetModule)) {
+                           String moduleName = module.getNameInHud();
+                           if (showInfo.isToggled() && !module.getInfo().isEmpty()) {
+                              moduleName = moduleName + " §7" + module.getInfo();
+                           }
+                           if (lowercase.isToggled()) {
+                              moduleName = moduleName.toLowerCase();
+                           }
+
+                           int xPos = posX;
+                           if (alignRight.isToggled()) {
+                              xPos -= mc.fontRendererObj.getStringWidth(moduleName);
+                           }
+
+                           int bgX1 = xPos - 1;
+                           int bgY1 = tempYPos - 1;
+                           int bgX2 = xPos + mc.fontRendererObj.getStringWidth(moduleName) + 1;
+                           double bgY2 = tempYPos + mc.fontRendererObj.FONT_HEIGHT + gapv - 2.5;
+
+                           RenderUtils.drawRect(bgX1, bgY1, bgX2 + 0.5, bgY2, alpha);
+
+                           tempYPos = (int)(tempYPos + (mc.fontRendererObj.FONT_HEIGHT + gapv));
+                        }
+                     }
+                  }
+               }
+
+               // Second pass: render text and outlines
                for (Module module : ModuleManager.organizedModules) {
                   if (module.isEnabled()
                      && module != this
@@ -139,29 +264,6 @@ public class HUD extends Module {
                      int xPos = posX;
                      if (alignRight.isToggled()) {
                         xPos -= mc.fontRendererObj.getStringWidth(moduleName);
-                     }
-
-                     // Background rendering
-                     if (backgroundAlpha.getInput() != 0.0 || backgroundBlur.isToggled() || backgroundBloom.isToggled()) {
-                        int bgX1 = xPos - 1;
-                        int bgY1 = yPos - 1;
-                        int bgX2 = xPos + mc.fontRendererObj.getStringWidth(moduleName) + 1;
-                        int bgY2 = (int)(yPos + mc.fontRendererObj.FONT_HEIGHT + gapv + 1);
-
-                        // Bloom/shadow effect
-                        if (backgroundBloom.isToggled()) {
-                           float bloomRadius = (float) backgroundBloomRadius.getInput();
-                           int maxAlphaBackground = a > 210 ? 210 : a;
-                           BlurUtils.bloomRect(bgX1, bgY1, bgX2 - bgX1, bgY2 - bgY1, 3, bloomRadius,
-                                               new Color(0, 0, 0, maxAlphaBackground));
-                        }
-
-                        if (backgroundBlur.isToggled()) {
-                           float blurRadius = (float) backgroundBlurRadius.getInput();
-                           BlurUtils.blurRect(bgX1, bgY1, bgX2 - bgX1, bgY2 - bgY1, 2, blurRadius);
-                        } else if (!backgroundBloom.isToggled()) {
-                           RenderUtils.drawRect(bgX1, bgY1, bgX2 + 0.5, bgY2, alpha);
-                        }
                      }
 
                      if (outline.getInput() == 1.0 && n2 == 0.0) {
@@ -387,19 +489,19 @@ public class HUD extends Module {
                         int bgX1 = xPos - 1;
                         int bgY1 = n - 1;
                         int bgX2 = xPos + this.mc.fontRendererObj.getStringWidth(moduleName) + 1;
-                        int bgY2 = (int)(n + this.mc.fontRendererObj.FONT_HEIGHT + HUD.gapv + 1);
+                        double bgY2 = n + this.mc.fontRendererObj.FONT_HEIGHT + HUD.gapv;
 
                         // Bloom/shadow effect
                         if (HUD.backgroundBloom.isToggled()) {
                            float bloomRadius = (float) HUD.backgroundBloomRadius.getInput();
                            int maxAlphaBackground = HUD.a > 210 ? 210 : HUD.a;
-                           BlurUtils.bloomRect(bgX1, bgY1, bgX2 - bgX1, bgY2 - bgY1, 3, bloomRadius,
+                           BlurUtils.bloomRect(bgX1, bgY1, bgX2 - bgX1, (float)(bgY2 - bgY1), 3, bloomRadius,
                                                new Color(0, 0, 0, maxAlphaBackground));
                         }
 
                         if (HUD.backgroundBlur.isToggled()) {
                            float blurRadius = (float) HUD.backgroundBlurRadius.getInput();
-                           BlurUtils.blurRect(bgX1, bgY1, bgX2 - bgX1, bgY2 - bgY1, 2, blurRadius);
+                           BlurUtils.blurRect(bgX1, bgY1, bgX2 - bgX1, (float)(bgY2 - bgY1), 2, blurRadius);
                         } else if (!HUD.backgroundBloom.isToggled()) {
                            RenderUtils.drawRect(bgX1, bgY1, bgX2 + 0.5, bgY2, HUD.a);
                         }
