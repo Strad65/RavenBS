@@ -86,10 +86,10 @@ public class ScaffoldBlockCount {
       // Bloom/shadow effect
       boolean bloomEnabled = ModuleManager.scaffold.blockCountBloomToggle.isToggled();
       float bloomRadius = bloomEnabled ? (float) ModuleManager.scaffold.blockCountBloom.getInput() : 0.0f;
-      int bloomAlpha = (int)(alpha * 0.43f); // Similar to TargetInfo's maxAlphaOutline logic
+      int maxAlphaBackground = (int)alpha > 210 ? 210 : (int)alpha;
       if (bloomRadius > 0.0f) {
          BlurUtils.bloomRect(bgX1, bgY1, bgX2 - bgX1, bgY2 - bgY1, 3, bloomRadius,
-                             new Color(0, 0, 0, bloomAlpha));
+                             new Color(0, 0, 0, maxAlphaBackground));
       }
 
       // Blur background

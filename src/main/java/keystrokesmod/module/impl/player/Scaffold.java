@@ -2008,10 +2008,10 @@ public class Scaffold extends Module {
          // Bloom/shadow effect
          boolean bloomEnabled = Scaffold.this.blockCountBloomToggle.isToggled();
          float bloomR = bloomEnabled ? (float) Scaffold.this.blockCountBloom.getInput() : 0.0f;
-         int bloomAlpha = 110; // Similar to TargetInfo's maxAlphaOutline
+         int maxAlphaBackground = 210; // Fixed alpha for edit screen
          if (bloomR > 0.0f) {
             BlurUtils.bloomRect(this.bgX1, this.bgY1, this.bgX2 - this.bgX1, this.bgY2 - this.bgY1, 3, bloomR,
-                                new Color(0, 0, 0, bloomAlpha));
+                                new Color(0, 0, 0, maxAlphaBackground));
          }
 
          // Blur background

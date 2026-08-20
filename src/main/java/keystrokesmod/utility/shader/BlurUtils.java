@@ -61,7 +61,7 @@ public class BlurUtils {
    public static void bloomRect(float x, float y, float width, float height, int passes, float radius, java.awt.Color color) {
       if (radius <= 0) return;
       prepareBloom();
-      RoundedUtils.drawRound(x, y, width, height, 0.0F, color);
+      RoundedUtils.drawRound(x, y, width, height, 0.0F, true, color);
       bloomEnd(passes, radius);
    }
 }
