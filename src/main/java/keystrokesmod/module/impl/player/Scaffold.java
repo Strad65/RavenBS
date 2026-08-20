@@ -73,6 +73,7 @@ public class Scaffold extends Module {
    public ButtonSetting jumpFacingForward;
    public ButtonSetting safeWalk;
    public ButtonSetting showBlockCount;
+   public ButtonSetting blockCountBlurToggle;
    public SliderSetting blockCountBlur;
    public int blockCountPosX = 0;
    public int blockCountPosY = 0;
@@ -237,7 +238,8 @@ public class Scaffold extends Module {
       this.registerSetting(this.jumpFacingForward = new ButtonSetting("Jump facing forward", false));
       this.registerSetting(this.safeWalk = new ButtonSetting("Safewalk", true));
       this.registerSetting(this.showBlockCount = new ButtonSetting("Show block count", true));
-      this.registerSetting(this.blockCountBlur = new SliderSetting("Block count blur", "px", 3.0, 0.0, 10.0, 0.5));
+      this.registerSetting(this.blockCountBlurToggle = new ButtonSetting("Block count blur", false));
+      this.registerSetting(this.blockCountBlur = new SliderSetting("Blur radius", "px", 3.0, 0.0, 10.0, 0.5));
       this.registerSetting(new ButtonSetting("Edit block count pos", () -> mc.displayGuiScreen(new Scaffold.BlockCountEditScreen())));
       this.registerSetting(this.silentSwing = new ButtonSetting("Silent swing", false));
       this.alwaysOn = true;
@@ -248,7 +250,8 @@ public class Scaffold extends Module {
       this.prioritizeSprintWithSpeed.setVisible(this.sprint.getInput() > 0.0, this);
       this.floatFirstJump.setVisible(this.sprint.getInput() == 2.0, this);
       boolean showBC = this.showBlockCount.isToggled();
-      this.blockCountBlur.setVisible(showBC, this);
+      this.blockCountBlurToggle.setVisible(showBC, this);
+      this.blockCountBlur.setVisible(showBC && this.blockCountBlurToggle.isToggled(), this);
    }
 
    @Override
@@ -259,7 +262,7 @@ public class Scaffold extends Module {
 
       this.disabledModule = true;
       this.moduleEnabled = false;
-      if (!this.isEnabled) {
+      if (!this.isEnabled && this.scaffoldBlockCount != null) {
          this.scaffoldBlockCount.beginFade();
       }
    }
@@ -1422,7 +1425,9 @@ public class Scaffold extends Module {
                ModuleManager.sprint.requireJump = false;
             }
 
-            this.scaffoldBlockCount.beginFade();
+            if (this.scaffoldBlockCount != null) {
+               this.scaffoldBlockCount.beginFade();
+            }
             this.hasSwapped = this.hasPlaced = false;
             this.targetBlock = null;
             this.blockInfo = null;
@@ -1995,7 +2000,8 @@ public class Scaffold extends Module {
          Scaffold.this.blockCountPosY = this.aY;
 
          // Blur background
-         float blurR = (float) Scaffold.this.blockCountBlur.getInput();
+         boolean blurEnabled = Scaffold.this.blockCountBlurToggle.isToggled();
+         float blurR = blurEnabled ? (float) Scaffold.this.blockCountBlur.getInput() : 0.0f;
          int bgAlpha = 199;
          if (blurR > 0.0f) {
             BlurUtils.blurRect(this.bgX1, this.bgY1, this.bgX2 - this.bgX1, this.bgY2 - this.bgY1, 2, blurR);

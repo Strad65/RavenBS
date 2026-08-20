@@ -10,6 +10,7 @@ import keystrokesmod.module.setting.impl.SliderSetting;
 import keystrokesmod.utility.RenderUtils;
 import keystrokesmod.utility.Theme;
 import keystrokesmod.utility.Utils;
+import keystrokesmod.utility.shader.BlurUtils;
 import net.minecraft.client.gui.FontRenderer;
 import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.gui.GuiScreen;
@@ -23,6 +24,8 @@ public class HUD extends Module {
    public static SliderSetting theme;
    private static SliderSetting outline;
    public static ButtonSetting alphabeticalSort;
+   private static ButtonSetting backgroundBlur;
+   private static SliderSetting backgroundBlurRadius;
    private static SliderSetting backgroundAlpha;
    private static SliderSetting gap;
    private static ButtonSetting alignRight;
@@ -47,6 +50,8 @@ public class HUD extends Module {
       this.registerSetting(new ButtonSetting("Edit position", () -> mc.displayGuiScreen(new HUD.EditScreen())));
       this.registerSetting(alignRight = new ButtonSetting("Align right", false));
       this.registerSetting(alphabeticalSort = new ButtonSetting("Alphabetical sort", false));
+      this.registerSetting(backgroundBlur = new ButtonSetting("Background blur", false));
+      this.registerSetting(backgroundBlurRadius = new SliderSetting("Blur radius", "px", 3.0, 0.0, 10.0, 0.5));
       this.registerSetting(backgroundAlpha = new SliderSetting("Background alpha", 50.0, 0.0, 100.0, 1.0));
       this.registerSetting(gap = new SliderSetting("Gap", 2.0, 0.0, 10.0, 0.5));
       this.registerSetting(lowercase = new ButtonSetting("Lowercase", false));
@@ -59,6 +64,11 @@ public class HUD extends Module {
    @Override
    public void onEnable() {
       ModuleManager.sort();
+   }
+
+   @Override
+   public void guiUpdate() {
+      this.backgroundBlurRadius.setVisible(backgroundBlur.isToggled(), this);
    }
 
    @Override
@@ -126,10 +136,19 @@ public class HUD extends Module {
                         xPos -= mc.fontRendererObj.getStringWidth(moduleName);
                      }
 
-                     if (backgroundAlpha.getInput() != 0.0) {
-                        RenderUtils.drawRect(
-                           xPos - 1, yPos - 1, xPos + mc.fontRendererObj.getStringWidth(moduleName) + 0.5, yPos + mc.fontRendererObj.FONT_HEIGHT + 1, alpha
-                        );
+                     // Background rendering
+                     if (backgroundAlpha.getInput() != 0.0 || backgroundBlur.isToggled()) {
+                        int bgX1 = xPos - 1;
+                        int bgY1 = yPos - 1;
+                        int bgX2 = xPos + mc.fontRendererObj.getStringWidth(moduleName) + 1;
+                        int bgY2 = yPos + mc.fontRendererObj.FONT_HEIGHT + 1;
+
+                        if (backgroundBlur.isToggled()) {
+                           float blurRadius = (float) backgroundBlurRadius.getInput();
+                           BlurUtils.blurRect(bgX1, bgY1, bgX2 - bgX1, bgY2 - bgY1, 2, blurRadius);
+                        } else {
+                           RenderUtils.drawRect(bgX1, bgY1, bgX2 + 0.5, bgY2, alpha);
+                        }
                      }
 
                      if (outline.getInput() == 1.0 && n2 == 0.0) {
@@ -350,14 +369,19 @@ public class HUD extends Module {
                         n2 -= 12.0;
                      }
 
-                     if (HUD.backgroundAlpha.getInput() != 0.0) {
-                        RenderUtils.drawRect(
-                           xPos - 1,
-                           n - 1,
-                           xPos + this.mc.fontRendererObj.getStringWidth(moduleName) + 0.5,
-                           n + this.mc.fontRendererObj.FONT_HEIGHT + HUD.gapv / 2.0,
-                           HUD.a
-                        );
+                     // Background rendering in EditScreen
+                     if (HUD.backgroundAlpha.getInput() != 0.0 || HUD.backgroundBlur.isToggled()) {
+                        int bgX1 = xPos - 1;
+                        int bgY1 = n - 1;
+                        int bgX2 = xPos + this.mc.fontRendererObj.getStringWidth(moduleName) + 1;
+                        int bgY2 = (int)(n + this.mc.fontRendererObj.FONT_HEIGHT + HUD.gapv / 2.0);
+
+                        if (HUD.backgroundBlur.isToggled()) {
+                           float blurRadius = (float) HUD.backgroundBlurRadius.getInput();
+                           BlurUtils.blurRect(bgX1, bgY1, bgX2 - bgX1, bgY2 - bgY1, 2, blurRadius);
+                        } else {
+                           RenderUtils.drawRect(bgX1, bgY1, bgX2 + 0.5, bgY2, HUD.a);
+                        }
                      }
 
                      if (n2 != 0.0 && HUD.outline.getInput() == 1.0) {

@@ -84,7 +84,8 @@ public class ScaffoldBlockCount {
       int bgY2 = y + this.mc.fontRendererObj.FONT_HEIGHT + PAD;
 
       // Blur background
-      float blurRadius = (float) ModuleManager.scaffold.blockCountBlur.getInput();
+      boolean blurEnabled = ModuleManager.scaffold.blockCountBlurToggle.isToggled();
+      float blurRadius = blurEnabled ? (float) ModuleManager.scaffold.blockCountBlur.getInput() : 0.0f;
       int bgAlpha = (int)(alpha * 0.78f);
       if (blurRadius > 0.0f) {
          // Mask the blurred game scene to this rect (sharp corners)
