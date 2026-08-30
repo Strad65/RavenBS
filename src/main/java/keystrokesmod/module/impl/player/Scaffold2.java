@@ -28,13 +28,16 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
  * - Movement fix enabled
  * - Silent rotation (1st person view unchanged, 3rd person shows rotation)
  * - Physics-accurate rotation calculation with raytrace validation
+ * - Prediction-aware placement timing
  */
 public class Scaffold2 extends Module {
 
     private float yaw;
     private float pitch;
     private BlockData targetBlock;
+    private BlockData lastTargetBlock; // Track last target to maintain rotation
     private int blockSlot = -1;
+    private boolean hasRotation = false; // Track if we have valid rotation
 
     public Scaffold2() {
         super("Scaffold2", category.player);
@@ -44,14 +47,18 @@ public class Scaffold2 extends Module {
     public void onEnable() {
         if (Utils.nullCheck()) {
             this.targetBlock = null;
+            this.lastTargetBlock = null;
             this.blockSlot = -1;
+            this.hasRotation = false;
         }
     }
 
     @Override
     public void onDisable() {
         this.targetBlock = null;
+        this.lastTargetBlock = null;
         this.blockSlot = -1;
+        this.hasRotation = false;
     }
 
     @SubscribeEvent(priority = EventPriority.HIGH)
@@ -66,36 +73,40 @@ public class Scaffold2 extends Module {
             return; // No blocks available
         }
 
-        // Find placement target
+        // Find placement target with prediction
         this.targetBlock = findPlacementTarget();
     }
 
     @SubscribeEvent
     public void onPreMotion(PreMotionEvent e) {
-        if (!Utils.nullCheck() || this.targetBlock == null) {
+        if (!Utils.nullCheck()) {
             return;
         }
 
-        // Calculate physics-accurate rotation to block face center
-        float[] rotation = calculateRotation(this.targetBlock);
+        // If we have a new target, calculate new rotation
+        if (this.targetBlock != null && !isSameTarget(this.targetBlock, this.lastTargetBlock)) {
+            float[] rotation = calculateRotation(this.targetBlock);
 
-        if (rotation == null) {
-            return; // Raytrace validation failed
+            if (rotation != null) {
+                this.yaw = rotation[0];
+                this.pitch = rotation[1];
+                this.hasRotation = true;
+                this.lastTargetBlock = this.targetBlock;
+            }
         }
 
-        this.yaw = rotation[0];
-        this.pitch = rotation[1];
+        // Apply rotation and movement fix if we have valid rotation
+        if (this.hasRotation) {
+            e.setYaw(this.yaw);
+            e.setPitch(this.pitch);
+            applyMovementFix(this.yaw);
+        }
 
-        // Apply server-side rotation
-        e.setYaw(this.yaw);
-        e.setPitch(this.pitch);
-
-        // Apply movement fix
-        applyMovementFix(this.yaw);
-
-        // Place block
-        if (placeBlock(this.targetBlock)) {
-            this.targetBlock = null; // Reset after successful placement
+        // Place block if target is valid
+        if (this.targetBlock != null) {
+            if (placeBlock(this.targetBlock)) {
+                this.targetBlock = null; // Reset after successful placement
+            }
         }
     }
 
@@ -118,10 +129,19 @@ public class Scaffold2 extends Module {
     }
 
     /**
-     * Find the block below player to place on
+     * Find the block below player to place on with prediction
      */
     private BlockData findPlacementTarget() {
-        BlockPos playerPos = new BlockPos(mc.thePlayer.posX, mc.thePlayer.posY, mc.thePlayer.posZ);
+        // Predict player position slightly ahead for better timing
+        double motionX = mc.thePlayer.motionX;
+        double motionZ = mc.thePlayer.motionZ;
+
+        // Check current position and slightly predicted position
+        BlockPos playerPos = new BlockPos(
+            mc.thePlayer.posX + motionX * 2,
+            mc.thePlayer.posY,
+            mc.thePlayer.posZ + motionZ * 2
+        );
         BlockPos belowPos = playerPos.down();
 
         // Check if block below is air
@@ -130,6 +150,7 @@ public class Scaffold2 extends Module {
         }
 
         // Search for a solid block adjacent to belowPos to place against
+        // Prioritize DOWN face for better simulation/prediction compatibility
         EnumFacing[] faces = {EnumFacing.DOWN, EnumFacing.NORTH, EnumFacing.SOUTH, EnumFacing.WEST, EnumFacing.EAST};
 
         for (EnumFacing facing : faces) {
@@ -148,6 +169,16 @@ public class Scaffold2 extends Module {
         }
 
         return null; // No valid placement target
+    }
+
+    /**
+     * Check if two targets are the same
+     */
+    private boolean isSameTarget(BlockData target1, BlockData target2) {
+        if (target1 == null || target2 == null) {
+            return false;
+        }
+        return target1.pos.equals(target2.pos) && target1.face == target2.face;
     }
 
     /**
